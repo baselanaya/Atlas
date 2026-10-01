@@ -43,6 +43,12 @@ interface HookPayload {
   tool_input?: Record<string, unknown>;
 }
 
+/** Says a line out loud when the user asked Voicebox for spoken events. */
+function maybeSpeak(line: string) {
+  if (!State.settings.voiceEnabled || !State.settings.voiceSpeakEvents) return;
+  void Bridge.voiceSpeak(line);
+}
+
 /** Short tag for steps and the approval card when the event isn't Claude's. */
 function agentTag(agent: string | undefined): string {
   return agent && agent !== "claude" ? agent : "";
@@ -240,6 +246,7 @@ function handleHook(island: Island, payload: HookPayload) {
       State.updateTask(taskId, "finished");
       if (said) State.appendStep(taskId, tagged(said.slice(0, 60)));
       Sound.play("finish");
+      maybeSpeak(`${projectName} finished`);
       if (focused) surface("finished", true);
       else State.setPillBadge(taskId, "finished");
       window.setTimeout(() => {
@@ -282,15 +289,17 @@ function handleHook(island: Island, payload: HookPayload) {
       if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
       const tool = payload.tool_name ?? "Tool";
       const input = payload.tool_input ?? {};
+      const target = approvalTarget(tool, input);
       State.pendingApproval = {
         requestId,
         sessionId: payload.session_id ?? "",
         tool,
-        command: tag ? `${tag} · ${approvalTarget(tool, input)}` : approvalTarget(tool, input),
+        command: tag ? `${tag} · ${target}` : target,
       };
       // The relay's short ack window closes in 800 ms; everything below this
       // line is synchronous, so the card really is up by the time it lands.
       if (requestId) void Bridge.approvalAck(requestId);
+      maybeSpeak(`${agentName} asks to ${target}`.slice(0, 160));
       State.updateTask(taskId, "approval");
       State.isPinned = true;
       Sound.play("approval");

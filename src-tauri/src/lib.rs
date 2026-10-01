@@ -13,6 +13,7 @@ mod pipe;
 mod secrets;
 mod settings;
 mod tray;
+mod voice;
 #[cfg(windows)]
 mod win_user;
 
@@ -246,6 +247,27 @@ fn set_paused(paused: bool) {
     integrations::set_paused(paused);
 }
 
+// ── Voice (Voicebox) ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn voice_status() -> voice::VoiceStatus {
+    voice::status().await
+}
+
+/// Spoken announcements (approvals, finishes), from the island's own events.
+#[tauri::command]
+async fn voice_speak(shared: State<'_, Shared>, text: String) -> Result<(), String> {
+    let (enabled, profile) = {
+        let settings = shared.settings.lock().unwrap();
+        (settings.voice_enabled, settings.voice_profile.clone())
+    };
+    if !enabled {
+        return Ok(());
+    }
+    voice::speak(&text, &profile).await;
+    Ok(())
+}
+
 // ── Access levels ──────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -341,7 +363,17 @@ async fn chat_send(
         let settings = shared.settings.lock().unwrap();
         (settings.model.clone(), settings.api_base.clone(), settings.chat_route.clone())
     };
-    claude::send(&chat, &model, &api_base, &route, query, context).await
+    let reply = claude::send(&chat, &model, &api_base, &route, query, context).await;
+    if let Ok(text) = &reply {
+        let (enabled, profile, speak_chat) = {
+            let settings = shared.settings.lock().unwrap();
+            (settings.voice_enabled, settings.voice_profile.clone(), settings.voice_speak_chat)
+        };
+        if enabled && speak_chat {
+            voice::speak(&text.text, &profile).await;
+        }
+    }
+    reply
 }
 
 #[tauri::command]
@@ -487,6 +519,8 @@ pub fn run() {
             quit_app,
             access_get,
             access_set,
+            voice_status,
+            voice_speak,
             hooks_status,
             hooks_statuses,
             hooks_preview,

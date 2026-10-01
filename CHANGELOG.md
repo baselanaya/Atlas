@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-10-01
+
+- **The island speaks** — Atlas integrates [Voicebox](https://github.com/jamiepine/voicebox)
+  (local, open source): chat replies read aloud, permission requests and
+  finished sessions announced, in any voice profile you've cloned. Detected
+  automatically on its local API (127.0.0.1:17493); every control is a
+  separate toggle in Settings → Voice, and nothing is spoken without the
+  master switch. Bonus: Voicebox's own global dictation hotkey already types
+  into Atlas's chat field — zero code needed.
+
 ## 0.3.0 — 2026-10-01
 
 - **New icon** — a proper space-scene SVG (glowing planet, ring with its

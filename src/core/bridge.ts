@@ -62,6 +62,10 @@ export const Bridge = {
   /** Writes to %LOCALAPPDATA%\Atlas\atlas.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
+  // ── Voice (Voicebox) ─────────────────────────────────────────────────────
+  voiceStatus: () => call<{ available: boolean; profiles: string[] }>("voice_status"),
+  voiceSpeak: (text: string) => call<void>("voice_speak", { text }),
+
   // ── Access levels (Claude Code, Codex; zcode is per-session) ─────────────
   accessGet: (agent: string) => call<AccessInfo>("access_get", { agent }),
   /** Sets the level — only ever from an explicit click on one. */

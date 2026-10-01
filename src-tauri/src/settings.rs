@@ -39,6 +39,22 @@ pub struct Settings {
     /// subscription instead of an API key.
     #[serde(default = "default_chat_route")]
     pub chat_route: String,
+    /// The island speaks through Voicebox when the studio is running.
+    #[serde(default)]
+    pub voice_enabled: bool,
+    /// Voice profile by name; empty = Voicebox's default.
+    #[serde(default)]
+    pub voice_profile: String,
+    /// Read chat replies out loud.
+    #[serde(default = "default_true")]
+    pub voice_speak_chat: bool,
+    /// Announce permission requests and finished sessions.
+    #[serde(default = "default_true")]
+    pub voice_speak_events: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_chat_route() -> String {
@@ -74,6 +90,10 @@ impl Default for Settings {
             model: default_model(),
             api_base: default_api_base(),
             chat_route: default_chat_route(),
+            voice_enabled: false,
+            voice_profile: String::new(),
+            voice_speak_chat: true,
+            voice_speak_events: true,
         }
     }
 }

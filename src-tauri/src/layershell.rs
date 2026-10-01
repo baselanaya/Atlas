@@ -113,7 +113,6 @@ pub fn active() -> bool {
 extern "C" {
     fn gtk_window_list_toplevels() -> *mut std::ffi::c_void; // GList*
     fn gtk_window_get_title(window: CWindow) -> *const std::ffi::c_char;
-    fn gtk_widget_get_window(widget: CWindow) -> *mut std::ffi::c_void; // GdkWindow*
 }
 
 /// The island's GtkWindow, by title. Null when not found.

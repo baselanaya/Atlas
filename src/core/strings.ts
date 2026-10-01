@@ -22,4 +22,13 @@ export const STR = {
   notHooked: fr ? "Non branché" : "Not hooked",
   keyMissing: fr ? "Clé non configurée" : "Key not configured",
   connected: fr ? "Connecté · chargement…" : "Connected · loading…",
+  voice: fr ? "Voix" : "Voice",
+  voiceOff: fr
+    ? "Voicebox n'est pas détecté — lancez-le, puis revenez ici."
+    : "Voicebox isn't detected — start it and come back here.",
+  voiceHint: fr
+    ? "Voicebox (open source, local) prête la voix ; Atlas décide quand parler."
+    : "Voicebox (open source, local) provides the voice; Atlas decides when to speak.",
+  speakChat: fr ? "Lire les réponses" : "Speak chat replies",
+  speakEvents: fr ? "Annoncer approbations et fins" : "Announce approvals and finishes",
 } as const;

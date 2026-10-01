@@ -317,6 +317,59 @@ function apiSection(hasKey: boolean): HTMLElement {
   );
 }
 
+// ── Voice section (Voicebox) ──────────────────────────────────────────────────
+
+function voiceSection(): HTMLElement {
+  const dot = statusDot(false);
+  const state = h("span", { class: "hint", text: STR.voiceOff });
+  const profile = h("select", {}) as HTMLSelectElement;
+  profile.style.flex = "1";
+
+  async function refresh() {
+    const status = await Bridge.voiceStatus();
+    dot.style.background = status?.available ? "#22c55e" : "#f4505e";
+    state.textContent = status?.available ? STR.voiceHint : STR.voiceOff;
+    clear(profile);
+    profile.append(h("option", { value: "", text: "Default voice" }));
+    for (const name of status?.profiles ?? []) {
+      profile.append(h("option", { value: name, text: name }));
+    }
+    profile.value = settings.voiceProfile || "";
+    if (profile.value !== settings.voiceProfile) profile.value = "";
+  }
+
+  const enabled = toggle(settings.voiceEnabled, (on) => {
+    settings.voiceEnabled = on;
+    void save();
+  });
+  const speakChat = toggle(settings.voiceSpeakChat, (on) => {
+    settings.voiceSpeakChat = on;
+    void save();
+  });
+  const speakEvents = toggle(settings.voiceSpeakEvents, (on) => {
+    settings.voiceSpeakEvents = on;
+    void save();
+  });
+  profile.addEventListener("change", () => {
+    settings.voiceProfile = profile.value;
+    void save();
+  });
+
+  void refresh();
+
+  return h(
+    "section",
+    {},
+    h("h2", {}, dot, h("span", { text: STR.voice })),
+    state,
+    h("div", { class: "row" }, h("label", { text: "Enabled" }), enabled),
+    h("div", { class: "row" }, h("label", { text: "Voice" }), profile),
+    h("div", { class: "row" }, h("label", { text: STR.speakChat }), speakChat),
+    h("div", { class: "row" }, h("label", { text: STR.speakEvents }), speakEvents),
+    h("div", { class: "hint", text: "github.com/jamiepine/voicebox — local, open source, MIT." }),
+  );
+}
+
 // ── Integrations section ──────────────────────────────────────────────────────
 
 interface IntegrationDef {
@@ -504,6 +557,7 @@ async function main() {
     h("h1", {}, h("span", { text: "Atlas" }), h("span", { class: "version", text: version })),
     ...statuses.map(agentSection),
     apiSection(hasKey),
+    voiceSection(),
     integrationsSection(present),
     generalSection(),
     h("div", {

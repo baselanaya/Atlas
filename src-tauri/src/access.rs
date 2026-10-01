@@ -35,13 +35,6 @@ impl AccessLevel {
         }
     }
 
-    fn as_str(self) -> &'static str {
-        match self {
-            AccessLevel::Ask => "ask",
-            AccessLevel::Auto => "auto",
-            AccessLevel::Root => "root",
-        }
-    }
 }
 
 #[derive(Serialize)]

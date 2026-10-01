@@ -121,6 +121,10 @@ export interface Settings {
   apiBase: string;
   /** Who answers the bubble: "api", or a logged-in CLI ("codex" | "claude"). */
   chatRoute: "api" | "codex" | "claude";
+  voiceEnabled: boolean;
+  voiceProfile: string;
+  voiceSpeakChat: boolean;
+  voiceSpeakEvents: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -137,6 +141,10 @@ export const DEFAULT_SETTINGS: Settings = {
   model: "claude-opus-5",
   apiBase: "https://api.anthropic.com",
   chatRoute: "api",
+  voiceEnabled: false,
+  voiceProfile: "",
+  voiceSpeakChat: true,
+  voiceSpeakEvents: true,
 };
 
 type Listener = () => void;
