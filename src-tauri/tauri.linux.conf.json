@@ -1,0 +1,6 @@
+{
+  "bundle": {
+    "targets": ["deb", "appimage"],
+    "resources": { "../target/release/atlas-hook": "atlas-hook" }
+  }
+}
