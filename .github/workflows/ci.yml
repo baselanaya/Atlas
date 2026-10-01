@@ -25,6 +25,9 @@ jobs:
             libgtk-3-dev libx11-dev libxext-dev \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
       - run: npm install
+      # The app's build script validates the bundled relay resource, so the
+      # release hook must exist before any cargo command touches the app crate.
+      - run: cargo build --release -p atlas-hook
       - run: cargo test --workspace
       - run: npm run build
 
@@ -41,4 +44,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      # The app's build script validates the bundled relay resource, so the
+      # release hook must exist before any cargo command touches the app crate.
+      - run: cargo build --release -p atlas-hook
       - run: cargo test --workspace
