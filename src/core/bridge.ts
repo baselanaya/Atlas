@@ -64,6 +64,10 @@ export const Bridge = {
 
   // ── Voice (Voicebox) ─────────────────────────────────────────────────────
   voiceStatus: () => call<{ available: boolean; profiles: string[] }>("voice_status"),
+  /** Audio (base64) → text, through Voicebox's Whisper. */
+  voiceTranscribe: (audioB64: string) => callOrThrow<string>("voice_transcribe", { audioB64 }),
+  mcpStatus: () => call<{ enabled: boolean; port: number; running: boolean }>("mcp_status"),
+  statsSnapshot: (days: number) => call<Record<string, unknown>>("stats_snapshot", { days }),
   voiceSpeak: (text: string) => call<void>("voice_speak", { text }),
 
   // ── Access levels (Claude Code, Codex; zcode is per-session) ─────────────

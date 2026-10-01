@@ -116,9 +116,79 @@ pub async fn speak(text: &str, profile: &str) {
         .await;
 }
 
+/// Audio → text, for the chat bubble's mic button. `audio_b64` is raw
+/// recorder output (webm/ogg), forwarded to Voicebox as-is.
+pub async fn transcribe(audio_b64: &str) -> Result<String, String> {
+    let bytes = decode64(audio_b64)?;
+    let part = reqwest::multipart::Part::bytes(bytes)
+        .file_name("atlas.webm")
+        .mime_str("audio/webm")
+        .map_err(|e| e.to_string())?;
+    let form = reqwest::multipart::Form::new().part("file", part);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .post(format!("{BASE}/transcribe"))
+        .header("X-Voicebox-Client-Id", CLIENT)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|_| "Voicebox isn't running.".to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("Voicebox transcribe failed ({})", resp.status()));
+    }
+    let v: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let text = ["text", "transcript", "content"]
+        .iter()
+        .find_map(|k| v.get(*k).and_then(Value::as_str))
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if text.is_empty() {
+        return Err("Voicebox returned no transcript.".into());
+    }
+    Ok(text)
+}
+
+/// Standard-alphabet base64 decode — the mirror of claude.rs's encoder,
+/// still not worth a dependency.
+fn decode64(input: &str) -> Result<Vec<u8>, String> {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = Vec::with_capacity(input.len() / 4 * 3);
+    let mut buf: u32 = 0;
+    let mut bits = 0u32;
+    for ch in input.bytes() {
+        if ch == b'=' || ch == b'\n' || ch == b'\r' {
+            continue;
+        }
+        let val = TABLE
+            .iter()
+            .position(|&t| t == ch)
+            .ok_or_else(|| "bad audio payload".to_string())? as u32;
+        buf = (buf << 6) | val;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parse_profiles;
+    use super::{decode64, parse_profiles};
+
+    #[test]
+    fn decode64_round_trips_the_encoder_contract() {
+        assert_eq!(decode64("").unwrap(), b"");
+        assert_eq!(decode64("Zg==").unwrap(), b"f");
+        assert_eq!(decode64("Zm9v").unwrap(), b"foo");
+        assert!(decode64("?").is_err());
+    }
 
     #[test]
     fn profile_lists_parse_from_the_shapes_voicebox_might_use() {

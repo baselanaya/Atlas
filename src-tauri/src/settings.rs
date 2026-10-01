@@ -51,6 +51,18 @@ pub struct Settings {
     /// Announce permission requests and finished sessions.
     #[serde(default = "default_true")]
     pub voice_speak_events: bool,
+    /// Atlas as an MCP server (127.0.0.1 only) — opt-in, like every service.
+    #[serde(default)]
+    pub mcp_enabled: bool,
+    #[serde(default = "default_mcp_port")]
+    pub mcp_port: u16,
+    /// System notifications for approvals and errors.
+    #[serde(default = "default_true")]
+    pub notify_enabled: bool,
+}
+
+fn default_mcp_port() -> u16 {
+    crate::mcp::DEFAULT_PORT
 }
 
 fn default_true() -> bool {
@@ -94,6 +106,9 @@ impl Default for Settings {
             voice_profile: String::new(),
             voice_speak_chat: true,
             voice_speak_events: true,
+            mcp_enabled: false,
+            mcp_port: default_mcp_port(),
+            notify_enabled: true,
         }
     }
 }

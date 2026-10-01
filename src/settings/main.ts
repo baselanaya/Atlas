@@ -224,6 +224,7 @@ function apiSection(hasKey: boolean): HTMLElement {
     ["api", "Direct API (key above)"],
     ["codex", "Codex (your ChatGPT login)"],
     ["claude", "Claude Code (your Anthropic login)"],
+    ["ollama", "Ollama (local, model above)"],
   ];
   for (const [id, label] of ROUTES) route.append(h("option", { value: id, text: label }));
   if (!ROUTES.some(([id]) => id === settings.chatRoute)) {
@@ -270,14 +271,24 @@ function apiSection(hasKey: boolean): HTMLElement {
     }
   });
 
-  const model = h("select", {}) as HTMLSelectElement;
-  for (const [id, label] of MODELS) model.append(h("option", { value: id, text: label }));
-  if (!MODELS.some(([id]) => id === settings.model)) {
-    model.append(h("option", { value: settings.model, text: settings.model }));
+  // A combo, not a list: API models are known, Ollama's are whatever the
+  // user has pulled — typing must work.
+  const model = h("input", {
+    type: "text",
+    style: "flex:1 1 auto;min-width:0",
+    list: "model-names",
+    autocomplete: "off",
+    spellcheck: "false",
+  }) as HTMLInputElement;
+  const modelList = h("datalist", { id: "model-names" });
+  for (const [id] of MODELS) modelList.append(h("option", { value: id }));
+  for (const id of ["llama3.1", "qwen3", "gemma3", "mistral"]) {
+    modelList.append(h("option", { value: id }));
   }
   model.value = settings.model;
   model.addEventListener("change", () => {
-    settings.model = model.value;
+    settings.model = model.value.trim();
+    model.value = settings.model;
     void save();
   });
 
@@ -310,7 +321,7 @@ function apiSection(hasKey: boolean): HTMLElement {
     state,
     h("div", { class: "row" }, h("label", { text: STR.apiKey }), field, saveBtn, clearBtn),
     h("div", { class: "row" }, h("label", { text: STR.apiBase }), base, datalist),
-    h("div", { class: "row" }, h("label", { text: STR.model }), model),
+    h("div", { class: "row" }, h("label", { text: STR.model }), model, modelList),
     h("div", { class: "row" }, h("label", { text: STR.answers }), route),
     h("div", { class: "hint", text: STR.cliRouteHint }),
     feedback,
@@ -368,6 +379,92 @@ function voiceSection(): HTMLElement {
     h("div", { class: "row" }, h("label", { text: STR.speakEvents }), speakEvents),
     h("div", { class: "hint", text: "github.com/jamiepine/voicebox — local, open source, MIT." }),
   );
+}
+
+// ── MCP-out section ────────────────────────────────────────────────────────────
+
+function mcpSection(): HTMLElement {
+  const dot = statusDot(false);
+  const state = h("span", { class: "hint" });
+  const port = h("input", {
+    type: "number",
+    min: "1024",
+    max: "65535",
+    style: "width:90px",
+    value: String(settings.mcpPort),
+  }) as HTMLInputElement;
+  const endpoint = h("span", { class: "path" });
+
+  async function refresh() {
+    const status = await Bridge.mcpStatus();
+    dot.style.background = status?.running ? "#22c55e" : "#8e939c";
+    state.textContent = status?.running
+      ? STR.mcpEndpoint(status.port)
+      : settings.mcpEnabled ? "Restart Atlas to serve." : STR.mcpHint;
+    endpoint.textContent = status?.running ? STR.mcpEndpoint(status.port) : "";
+  }
+
+  const enabled = toggle(settings.mcpEnabled, (on) => {
+    settings.mcpEnabled = on;
+    void save();
+    void refresh();
+  });
+  port.addEventListener("change", () => {
+    settings.mcpPort = Number(port.value) || 17510;
+    void save();
+    void refresh();
+  });
+
+  void refresh();
+  return h(
+    "section",
+    {},
+    h("h2", {}, dot, h("span", { text: STR.mcp })),
+    state,
+    h("div", { class: "row" }, h("label", { text: "Enabled" }), enabled,
+      h("label", { text: "Port" }), port),
+    h("div", { class: "row" }, h("label", { text: "Endpoint" }), endpoint),
+    h("div", { class: "hint", text: STR.mcpHint }),
+  );
+}
+
+// ── Notifications section ──────────────────────────────────────────────────────
+
+function notificationsSection(): HTMLElement {
+  const enabled = toggle(settings.notifyEnabled, (on) => {
+    settings.notifyEnabled = on;
+    void save();
+  });
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: STR.notifications })),
+    h("div", { class: "row" }, h("label", { text: "Enabled" }), enabled),
+    h("div", { class: "hint", text: STR.notifyHint }),
+  );
+}
+
+// ── Stats section ──────────────────────────────────────────────────────────────
+
+function statsSection(): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:6px" });
+  void (async () => {
+    const snap = await Bridge.statsSnapshot(7);
+    if (!snap) return;
+    const days = Object.entries(snap as Record<string, unknown>)
+      .sort((a, b) => b[0].localeCompare(a[0]));
+    for (const [day, entry] of days.slice(0, 7)) {
+      const agents = ((entry as { agents?: Record<string, Record<string, number>> }).agents) ?? {};
+      const cells = Object.entries(agents).map(([agent, s]) =>
+        `${agent}: ${s.sessions ?? 0} ${STR.sessions}, ${s.tool_calls ?? 0} ${STR.tools}, ${s.approvals ?? 0} ${STR.approvals}`);
+      body.append(h("div", { class: "row" },
+        h("label", { text: day }),
+        h("span", { class: "hint", text: cells.join(" · ") || "—" }),
+      ));
+    }
+    if (days.length === 0) body.append(h("div", { class: "hint", text: "—" }));
+  })();
+  return h("section", {}, h("h2", {}, h("span", { text: STR.stats })), body);
 }
 
 // ── Integrations section ──────────────────────────────────────────────────────
@@ -558,6 +655,9 @@ async function main() {
     ...statuses.map(agentSection),
     apiSection(hasKey),
     voiceSection(),
+    mcpSection(),
+    notificationsSection(),
+    statsSection(),
     integrationsSection(present),
     generalSection(),
     h("div", {

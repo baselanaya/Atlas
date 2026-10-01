@@ -119,12 +119,15 @@ export interface Settings {
   model: string;
   /** Anthropic-compatible Messages API base; GLM runs from Z.AI's. */
   apiBase: string;
-  /** Who answers the bubble: "api", or a logged-in CLI ("codex" | "claude"). */
-  chatRoute: "api" | "codex" | "claude";
+  /** Who answers the bubble: "api", a logged-in CLI, or local "ollama". */
+  chatRoute: "api" | "codex" | "claude" | "ollama";
   voiceEnabled: boolean;
   voiceProfile: string;
   voiceSpeakChat: boolean;
   voiceSpeakEvents: boolean;
+  mcpEnabled: boolean;
+  mcpPort: number;
+  notifyEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -145,6 +148,9 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceProfile: "",
   voiceSpeakChat: true,
   voiceSpeakEvents: true,
+  mcpEnabled: false,
+  mcpPort: 17510,
+  notifyEnabled: true,
 };
 
 type Listener = () => void;

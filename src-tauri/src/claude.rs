@@ -91,6 +91,7 @@ pub async fn send(
     match route {
         "codex" => return cli_turn(chat, "codex", &query).await,
         "claude" => return cli_turn(chat, "claude", &query).await,
+        "ollama" => return ollama_turn(chat, model, &query).await,
         _ => {}
     }
     let key = secrets::get("anthropic-api-key")
@@ -176,6 +177,50 @@ pub async fn send(
     if text.is_empty() {
         return Err("No response text.".into());
     }
+    Ok(ChatReply { text })
+}
+
+/// One turn through a local Ollama (http://127.0.0.1:11434). The model name
+/// is whatever the user typed in Settings — llama3.1, qwen3, gemma3, …
+async fn ollama_turn(chat: &Chat, model: &str, query: &str) -> Result<ChatReply, String> {
+    const BASE: &str = "http://127.0.0.1:11434";
+
+    let mut messages = vec![json!({ "role": "system", "content": SYSTEM_PROMPT })];
+    {
+        let turns = chat.turns.lock().unwrap();
+        for (q, a) in turns.iter().rev().take(6).collect::<Vec<_>>().into_iter().rev() {
+            messages.push(json!({ "role": "user", "content": q }));
+            messages.push(json!({ "role": "assistant", "content": a }));
+        }
+    }
+    messages.push(json!({ "role": "user", "content": query }));
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .post(format!("{BASE}/api/chat"))
+        .json(&json!({ "model": model, "messages": messages, "stream": false }))
+        .send()
+        .await
+        .map_err(|_| "Ollama isn't running (127.0.0.1:11434).".to_string())?;
+    if !resp.status().is_success() {
+        let detail = resp.text().await.unwrap_or_default();
+        return Err(format!("Ollama {}: {}", detail.chars().take(200).collect::<String>(), ""));
+    }
+    let v: Value = resp.json().await.map_err(|e| format!("Bad Ollama response: {e}"))?;
+    let text = v
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if text.is_empty() {
+        return Err("Ollama returned nothing — is the model pulled?".into());
+    }
+    chat.turns.lock().unwrap().push((query.to_string(), text.clone()));
     Ok(ChatReply { text })
 }
 

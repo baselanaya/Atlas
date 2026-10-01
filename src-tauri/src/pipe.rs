@@ -62,6 +62,19 @@ pub enum Reply {
 #[derive(Default)]
 pub struct Pending(pub Mutex<HashMap<String, mpsc::Sender<Reply>>>);
 
+/// The same requests, described for humans and MCP clients: what is being
+/// asked, by which agent, under which id. Kept beside the senders and removed
+/// with them.
+#[derive(Default)]
+pub struct PendingInfo(pub Mutex<Vec<serde_json::Value>>);
+
+/// The pending card list, newest last — what `atlas_pending` reports.
+pub fn pending_info() -> Value {
+    PENDING_INFO.0.lock().unwrap().clone().into()
+}
+
+static PENDING_INFO: PendingInfo = PendingInfo(Mutex::new(Vec::new()));
+
 static COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// `\\.\pipe\atlas-<sid>` — must match atlas-hook's `pipe_path()` exactly.
@@ -185,6 +198,9 @@ where
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
+    let agent = payload.get("agent").and_then(Value::as_str).unwrap_or("claude").to_string();
+
+    crate::stats::record(&agent, &event, None);
 
     if event != "PermissionRequest" {
         log::line(format!("hook {event}"));
@@ -200,10 +216,31 @@ where
     }
     payload["request_id"] = json!(id);
     log::line(format!("hook PermissionRequest id={id}"));
+
+    // The human-facing card list (ours + the MCP tools').
+    {
+        let card = json!({
+            "request_id": id,
+            "agent": agent,
+            "tool": payload.get("tool_name").and_then(Value::as_str).unwrap_or("Tool"),
+            "target": payload
+                .get("tool_input")
+                .and_then(|i| i.get("command").or_else(|| i.get("file_path")).or_else(|| i.get("path")))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .chars().take(120).collect::<String>(),
+        });
+        PENDING_INFO.0.lock().unwrap().push(card);
+    }
+    crate::notify::approval(&app, &agent, &payload);
     let _ = app.emit_to(WINDOW_LABEL, "hook", payload);
 
     let decision = wait_for_decision(&id, &mut rx).await;
     app.state::<Pending>().0.lock().unwrap().remove(&id);
+    PENDING_INFO.0.lock().unwrap().retain(|c| c.get("request_id") != Some(&json!(id)));
+    if let Some(d) = &decision {
+        crate::stats::record(&agent, "Decision", Some(d));
+    }
 
     // No decision: say nothing at all. atlas-hook then writes nothing to stdout
     // and Claude Code asks in the terminal, exactly as if Atlas were closed.

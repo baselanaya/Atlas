@@ -31,4 +31,19 @@ export const STR = {
     : "Voicebox (open source, local) provides the voice; Atlas decides when to speak.",
   speakChat: fr ? "Lire les réponses" : "Speak chat replies",
   speakEvents: fr ? "Annoncer approbations et fins" : "Announce approvals and finishes",
+  micTitle: fr ? "Dicter (Voicebox)" : "Dictate (Voicebox)",
+  micRecording: fr ? "Clic pour arrêter" : "Click to stop",
+  mcp: "MCP",
+  mcpHint: fr
+    ? "Expose Atlas comme serveur MCP local — d'autres outils peuvent suivre vos agents et répondre à leurs demandes."
+    : "Expose Atlas as a local MCP server — other tools can watch your agents and answer their requests.",
+  mcpEndpoint: (port: number) => `http://127.0.0.1:${port}/mcp`,
+  notifications: fr ? "Notifications" : "Notifications",
+  notifyHint: fr
+    ? "Notifications système pour les demandes d'approbation."
+    : "System notifications for approval requests.",
+  stats: fr ? "Statistiques" : "Stats",
+  sessions: fr ? "sessions" : "sessions",
+  tools: fr ? "outils" : "tools",
+  approvals: fr ? "approbations" : "approvals",
 } as const;

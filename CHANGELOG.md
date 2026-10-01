@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-10-02
+
+- **MCP-out** — Atlas is now a tool server: any local MCP client can call
+  `atlas_status`, `atlas_pending`, `atlas_decide`, `atlas_speak` and
+  `atlas_stats` over 127.0.0.1 (JSON-RPC, opt-in in Settings → MCP). Voice
+  assistants and IDEs can finally *ask* Atlas what the agents are doing.
+- **Dictation in the chat** — a mic button records and transcribes through
+  Voicebox's Whisper endpoint straight into the input.
+- **Ollama route** — the chat bubble can answer from a local Ollama
+  (Settings → Chat → Answers); the model field is now a free-text combo.
+- **Stats** — per-agent daily counters (sessions, tool calls, approvals,
+  allow/deny decisions) in Settings → Stats and via `atlas_stats`.
+- **System notifications** — approval requests raise a desktop notification
+  (notify-send) even when the island is collapsed; toggleable.
+
 ## 0.4.0 — 2026-10-01
 
 - **The island speaks** — Atlas integrates [Voicebox](https://github.com/jamiepine/voicebox)

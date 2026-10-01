@@ -23,7 +23,9 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # comments and tables is exactly what toml_edit is for.
 toml_edit = "0.22"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
+# The MCP-out server: the smallest honest HTTP listener there is.
+tiny_http = "0.12"
 keyring = "3"
 
 # Just enough Win32 for the island window (cursor poll, no-activate, drag hack)

@@ -8,6 +8,9 @@ mod hooks;
 mod integrations;
 mod island;
 pub mod layershell;
+mod mcp;
+mod notify;
+mod stats;
 mod log;
 mod pipe;
 mod secrets;
@@ -245,6 +248,24 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn set_paused(paused: bool) {
     integrations::set_paused(paused);
+}
+
+// ── MCP-out / stats ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn mcp_status(app: AppHandle) -> mcp::McpStatus {
+    mcp::status(&app)
+}
+
+#[tauri::command]
+fn stats_snapshot(days: Option<usize>) -> serde_json::Value {
+    stats::snapshot_json(days.unwrap_or(7).clamp(1, 60))
+}
+
+/// Voice → text through Voicebox's /transcribe (multipart audio upload).
+#[tauri::command]
+async fn voice_transcribe(audio_b64: String) -> Result<String, String> {
+    crate::voice::transcribe(&audio_b64).await
 }
 
 // ── Voice (Voicebox) ───────────────────────────────────────────────────────────
@@ -521,6 +542,9 @@ pub fn run() {
             access_set,
             voice_status,
             voice_speak,
+            voice_transcribe,
+            mcp_status,
+            stats_snapshot,
             hooks_status,
             hooks_statuses,
             hooks_preview,
@@ -591,6 +615,7 @@ pub fn run() {
             if first_run {
                 crate::show_settings_window(&handle);
             }
+            mcp::start_if_enabled(&handle);
             Ok(())
         })
         .run(tauri::generate_context!())
