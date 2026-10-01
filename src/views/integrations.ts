@@ -7,6 +7,7 @@
 import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { State, isAgentTask, type AccessLevel, type AgentTask } from "../core/state";
+import { STR } from "../core/strings";
 import { Bridge } from "../core/bridge";
 
 /** Same shape as the Swift `timeAgo` computed properties. */
@@ -66,8 +67,8 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
     task.id === "integration_zcode" ? State.settings.hooksInstalledZcode
     : task.id === "integration_codex" ? State.settings.hooksInstalledCodex
     : State.settings.hooksInstalled;
-  const missing = isAgent ? "Not hooked" : "Key not configured";
-  const connected = isAgent ? "Hooked in · waiting for sessions" : "Connected · loading…";
+  const missing = isAgent ? STR.notHooked : STR.keyMissing;
+  const connected = isAgent ? STR.hookedIn : STR.connected;
   const ready = isAgent ? agentHooked : configured;
   const label = error ?? (ready ? connected : missing);
   const statusColor = error || !configured ? "#F4505E" : "#22C55E";
@@ -129,9 +130,9 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
 // ── Access level ──────────────────────────────────────────────────────────────
 
 const ACCESS_LEVELS: { id: AccessLevel; label: string; color: string; hint: string }[] = [
-  { id: "ask", label: "Ask", color: "#22C55E", hint: "Asks before anything risky (each harness's default)" },
+  { id: "ask", label: STR.ask, color: "#22C55E", hint: "Asks before anything risky (each harness's default)" },
   { id: "auto", label: "Auto", color: "#F29B38", hint: "Answers the routine prompts itself, asks for the rest" },
-  { id: "root", label: "Root", color: "#F4505E", hint: "No permission prompts at all — bypass / full sandbox. New sessions only." },
+  { id: "root", label: STR.root, color: "#F4505E", hint: "No permission prompts at all — bypass / full sandbox. New sessions only." },
 ];
 
 /**
@@ -150,7 +151,7 @@ function accessRow(task: AgentTask): HTMLElement {
   }
 
   const wrap = h("div", { class: "row", style: "gap:6px;flex-wrap:wrap" });
-  wrap.append(h("label", { text: "Access" }));
+  wrap.append(h("label", { text: STR.access }));
   for (const level of ACCESS_LEVELS) {
     const on = info?.level === level.id;
     const btn = h("button", {
@@ -175,7 +176,7 @@ function accessRow(task: AgentTask): HTMLElement {
     });
     wrap.append(btn);
   }
-  wrap.append(h("span", { class: "hint", style: "flex-basis:100%", text: "New sessions only" }));
+  wrap.append(h("span", { class: "hint", style: "flex-basis:100%", text: STR.newSessionsOnly }));
   return wrap;
 }
 

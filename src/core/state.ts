@@ -119,6 +119,8 @@ export interface Settings {
   model: string;
   /** Anthropic-compatible Messages API base; GLM runs from Z.AI's. */
   apiBase: string;
+  /** Who answers the bubble: "api", or a logged-in CLI ("codex" | "claude"). */
+  chatRoute: "api" | "codex" | "claude";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -134,6 +136,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hooksInstalledCodex: false,
   model: "claude-opus-5",
   apiBase: "https://api.anthropic.com",
+  chatRoute: "api",
 };
 
 type Listener = () => void;

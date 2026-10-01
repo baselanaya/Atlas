@@ -1,0 +1,13 @@
+name: Feature request
+description: An idea for Atlas
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes:
+      label: What should Atlas do?
+      description: The more concrete, the better — "the island should…" beats "improve X".
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Which agent / integration does it involve?

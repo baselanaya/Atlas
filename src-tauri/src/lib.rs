@@ -7,6 +7,7 @@ mod files;
 mod hooks;
 mod integrations;
 mod island;
+pub mod layershell;
 mod log;
 mod pipe;
 mod secrets;
@@ -336,11 +337,11 @@ async fn chat_send(
     query: String,
     context: Option<ChatContext>,
 ) -> Result<ChatReply, String> {
-    let (model, api_base) = {
+    let (model, api_base, route) = {
         let settings = shared.settings.lock().unwrap();
-        (settings.model.clone(), settings.api_base.clone())
+        (settings.model.clone(), settings.api_base.clone(), settings.chat_route.clone())
     };
-    claude::send(&chat, &model, &api_base, query, context).await
+    claude::send(&chat, &model, &api_base, &route, query, context).await
 }
 
 #[tauri::command]
@@ -458,6 +459,9 @@ fn open_settings_window(app: AppHandle) {
 
 pub fn run() {
     let loaded = settings::load();
+    // A fresh install has never saved settings: open the window where the
+    // hooks get installed, so the island isn't a pet that watches nothing.
+    let first_run = !settings::config_exists();
     let gate = Arc::new(PollGate::new());
 
     tauri::Builder::default()
@@ -508,6 +512,28 @@ pub fn run() {
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
 
+            // Native Wayland: the compositor places a layer surface; the
+            // margin centers it on the primary output.
+            #[cfg(target_os = "linux")]
+            if std::env::var("GDK_BACKEND").as_deref() == Ok("wayland") {
+                if let Some(gtk_win) = layershell::island_window() {
+                    let scale = island::screen_info(&handle, "primary").scale;
+                    let width = island::screen_info(&handle, "primary").width;
+                    let margin = ((width - island::PANEL_W) / 2.0).round() as i32;
+                    let ok = layershell::try_init(
+                        gtk_win,
+                        margin,
+                        (island::PANEL_W * scale).round() as i32,
+                        (island::PANEL_H * scale).round() as i32,
+                    );
+                    if ok {
+                        log::line(format!(
+                            "island: native Wayland layer surface (margin {margin})"
+                        ));
+                    }
+                }
+            }
+
             if let Some(win) = island::window(&handle) {
                 island::make_non_activating(&win);
                 // GTK drops position requests made while the window is still
@@ -528,6 +554,9 @@ pub fn run() {
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
             integrations::start(handle.clone());
+            if first_run {
+                crate::show_settings_window(&handle);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

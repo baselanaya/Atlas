@@ -36,11 +36,15 @@ No markdown formatting (no **, no ##, no bullet dashes). Use plain text with lin
 pub struct Chat {
     /// Full multi-turn history, including tool_use / tool_result blocks.
     messages: Mutex<Vec<Value>>,
+    /// Plain (question, answer) turns for the CLI routes, where there are no
+    /// content blocks to preserve.
+    turns: Mutex<Vec<(String, String)>>,
 }
 
 impl Chat {
     pub fn reset(&self) {
         self.messages.lock().unwrap().clear();
+        self.turns.lock().unwrap().clear();
     }
 
     fn is_empty(&self) -> bool {
@@ -73,15 +77,22 @@ pub struct ChatReply {
     pub text: String,
 }
 
-/// One chat turn. Returns the assistant's text, or a message the island shows
-/// in the note view.
+/// One chat turn, routed by settings: the Messages API, or a logged-in CLI
+/// agent answering with the subscription the user already pays for. Returns
+/// the assistant's text, or a message the island shows in the note view.
 pub async fn send(
     chat: &Chat,
     model: &str,
     api_base: &str,
+    route: &str,
     query: String,
     context: Option<ChatContext>,
 ) -> Result<ChatReply, String> {
+    match route {
+        "codex" => return cli_turn(chat, "codex", &query).await,
+        "claude" => return cli_turn(chat, "claude", &query).await,
+        _ => {}
+    }
     let key = secrets::get("anthropic-api-key")
         .ok_or_else(|| "API key missing. Open settings.".to_string())?;
 
@@ -165,6 +176,85 @@ pub async fn send(
     if text.is_empty() {
         return Err("No response text.".into());
     }
+    Ok(ChatReply { text })
+}
+
+/// One turn through a CLI agent. The rolling transcript rides along as plain
+/// text — the CLI is one-shot, so history is prompt, not protocol.
+async fn cli_turn(chat: &Chat, agent: &str, query: &str) -> Result<ChatReply, String> {
+    let mut prompt = String::new();
+    {
+        let turns = chat.turns.lock().unwrap();
+        let kept = turns.iter().rev().take(6).collect::<Vec<_>>().into_iter().rev();
+        if turns.len() > 6 || turns.is_empty() {
+            // nothing to note
+        }
+        let _ = kept.clone().count();
+        if !turns.is_empty() {
+            prompt.push_str("Conversation so far:\n");
+            for (q, a) in kept {
+                prompt.push_str(&format!("User: {q}\n{agent}: {a}\n"));
+            }
+            prompt.push('\n');
+        }
+    }
+    prompt.push_str(&format!("User: {query}\n\nReply concisely, plain text, no markdown."));
+
+    let out_path = std::env::temp_dir().join(format!("atlas-chat-{agent}-{}", std::process::id()));
+    let use_file = agent == "codex";
+
+    let mut cmd = std::process::Command::new(agent);
+    cmd.stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    if use_file {
+        // -C - keeps it out of any project's git rules; the file takes the
+        // final message so the transcript never parses progress noise.
+        cmd.args(["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-C", "-", "-o"])
+            .arg(&out_path)
+            .arg(&prompt)
+            .stdout(std::process::Stdio::null());
+    } else {
+        cmd.arg("-p").arg(&prompt).stdout(std::process::Stdio::piped());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Could not run {agent}: {e}. Is it installed and on PATH?"))?;
+
+    // A live agent takes a while; wait off the runtime thread, reading any
+    // stdout to its end first (claude -p writes the reply there).
+    let result = tokio::task::spawn_blocking(move || -> std::io::Result<(std::process::ExitStatus, String)> {
+        let mut text = String::new();
+        if let Some(mut out) = child.stdout.take() {
+            use std::io::Read;
+            let _ = out.read_to_string(&mut text);
+        }
+        let status = child.wait()?;
+        Ok((status, text))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("{agent} failed: {e}"))?;
+
+    let (status, stdout_text) = result;
+    if !status.success() {
+        return Err(format!("{agent} exited unsuccessfully ({}). Is it logged in?", status));
+    }
+    let text = if use_file {
+        std::fs::read_to_string(&out_path).unwrap_or_default()
+    } else {
+        stdout_text
+    };
+    let _ = std::fs::remove_file(&out_path);
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err(format!("{agent} returned nothing."));
+    }
+    chat.turns.lock().unwrap().push((query.to_string(), text.clone()));
     Ok(ChatReply { text })
 }
 

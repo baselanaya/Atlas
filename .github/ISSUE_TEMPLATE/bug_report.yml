@@ -1,0 +1,34 @@
+name: Bug report
+description: Something is broken
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: And what did you expect instead?
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Which agent were you watching?
+      options:
+        - Claude Code
+        - ZCode
+        - Codex
+        - Several / not sure
+  - type: dropdown
+    attributes:
+      label: Desktop
+      options:
+        - Linux — KDE (Wayland)
+        - Linux — KDE (X11)
+        - Linux — GNOME
+        - Linux — other
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Log tail
+      description: ~/.local/state/atlas/atlas.log (Linux) or %LOCALAPPDATA%\Atlas\atlas.log (Windows) — the lines around the problem.
+      render: text

@@ -5,6 +5,7 @@
 import "./settings.css";
 import { Bridge, onEvent, type HookStatus } from "../core/bridge";
 import { DEFAULT_SETTINGS, type Settings } from "../core/state";
+import { STR } from "../core/strings";
 import { h, clear } from "../views/dom";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -217,6 +218,23 @@ function apiSection(hasKey: boolean): HTMLElement {
   const clearBtn = h("button", { class: "danger", text: "Remove" });
   const feedback = h("div", {});
 
+  // Who answers: the API key above, or a logged-in CLI on the user's own plan.
+  const route = h("select", {}) as HTMLSelectElement;
+  const ROUTES: [string, string][] = [
+    ["api", "Direct API (key above)"],
+    ["codex", "Codex (your ChatGPT login)"],
+    ["claude", "Claude Code (your Anthropic login)"],
+  ];
+  for (const [id, label] of ROUTES) route.append(h("option", { value: id, text: label }));
+  if (!ROUTES.some(([id]) => id === settings.chatRoute)) {
+    route.append(h("option", { value: settings.chatRoute, text: settings.chatRoute }));
+  }
+  route.value = settings.chatRoute;
+  route.addEventListener("change", () => {
+    settings.chatRoute = route.value as typeof settings.chatRoute;
+    void save();
+  });
+
   async function refresh() {
     const present = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
     dot.style.background = present ? "#22c55e" : "#f4505e";
@@ -288,11 +306,13 @@ function apiSection(hasKey: boolean): HTMLElement {
   return h(
     "section",
     {},
-    h("h2", {}, dot, h("span", { text: "Chat" })),
+    h("h2", {}, dot, h("span", { text: STR.chatSection })),
     state,
-    h("div", { class: "row" }, h("label", { text: "API key" }), field, saveBtn, clearBtn),
-    h("div", { class: "row" }, h("label", { text: "API base" }), base, datalist),
-    h("div", { class: "row" }, h("label", { text: "Model" }), model),
+    h("div", { class: "row" }, h("label", { text: STR.apiKey }), field, saveBtn, clearBtn),
+    h("div", { class: "row" }, h("label", { text: STR.apiBase }), base, datalist),
+    h("div", { class: "row" }, h("label", { text: STR.model }), model),
+    h("div", { class: "row" }, h("label", { text: STR.answers }), route),
+    h("div", { class: "hint", text: STR.cliRouteHint }),
     feedback,
   );
 }

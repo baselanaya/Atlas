@@ -34,6 +34,15 @@ pub struct Settings {
     /// (https://api.z.ai/api/anthropic) serves glm-5.3 and friends from there.
     #[serde(default = "default_api_base")]
     pub api_base: String,
+    /// Who answers the bubble: the API above, or a logged-in CLI agent —
+    /// "api" | "codex" | "claude". CLI routes ride on the user's own
+    /// subscription instead of an API key.
+    #[serde(default = "default_chat_route")]
+    pub chat_route: String,
+}
+
+fn default_chat_route() -> String {
+    "api".to_string()
 }
 
 fn default_model() -> String {
@@ -64,6 +73,7 @@ impl Default for Settings {
             hooks_installed_codex: false,
             model: default_model(),
             api_base: default_api_base(),
+            chat_route: default_chat_route(),
         }
     }
 }
@@ -137,6 +147,11 @@ pub fn socket_path() -> PathBuf {
 
 fn settings_path() -> PathBuf {
     config_dir().join("settings.json")
+}
+
+/// Whether the user's settings file exists — the first-run signal.
+pub fn config_exists() -> bool {
+    settings_path().exists()
 }
 
 pub fn load() -> Settings {

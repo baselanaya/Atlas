@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — 2026-10-01
+
+- **New icon** — a proper space-scene SVG (glowing planet, ring with its
+  shadow, starfield), rasterized at every bundle size.
+- **Native Wayland (experimental)** — when `gtk3-layer-shell` is installed,
+  the island runs as a layer surface positioned by the compositor; XWayland
+  remains the fallback (and `ATLAS_ISLAND=x11|wayland` forces either).
+  Eye tracking pauses on native Wayland — a Wayland client can't see the
+  cursor outside its own windows.
+- **Chat routing** — the bubble can answer through a logged-in Codex or
+  Claude Code instead of the API key (Settings → Chat → Answers), riding on
+  the subscription you already pay for.
+- **Relay protocol tests** — golden tests run the real `atlas-hook` binary
+  against a mock app: wire format, agent stamping, and the byte-stable
+  PermissionRequest decision JSON.
+- **Emote synthesis** — zcode and Codex sessions now show the rate-limit and
+  question faces, inferred from what their turns say (they have no
+  Notification event of their own).
+- **First-run onboarding** — a fresh install opens the settings window where
+  the hooks live, so the island never starts life watching nothing.
+- Issue templates, GitHub Discussions, localizable strings (`src/core/strings.ts`),
+  AUR publishing guide (`packaging/README.md`).
+
 ## 0.2.1 — 2026-10-01
 
 - English step labels in the session ticker (Runs / Reads / Edits / …) — the

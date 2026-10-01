@@ -37,6 +37,8 @@ interface HookPayload {
   message?: string;
   /** UserPromptSubmit carries `prompt`; `message` belongs to Notification/Stop. */
   prompt?: string;
+  /** Codex's Stop carries the final answer here instead of `message`. */
+  last_assistant_message?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
 }
@@ -221,9 +223,22 @@ function handleHook(island: Island, payload: HookPayload) {
       break;
     }
 
-    case "Stop":
+    case "Stop": {
+      // zcode and Codex have no Notification event, so the faces Claude gets
+      // for free are inferred here from what the turn actually said.
+      const said = (payload.message ?? payload.last_assistant_message ?? "").trim();
+      const lower = said.toLowerCase();
+      if (taskId !== CLAUDE_ID && lower) {
+        if (lower.includes("rate limit") || lower.includes("usage limit") || lower.includes("quota")) {
+          State.updateTask(taskId, "ratelimit");
+          Sound.play("rate");
+        } else if (said.endsWith("?")) {
+          State.updateTask(taskId, "question");
+          State.appendStep(taskId, tagged(said.slice(0, 60)));
+        }
+      }
       State.updateTask(taskId, "finished");
-      if (payload.message) State.appendStep(taskId, tagged(payload.message.slice(0, 60)));
+      if (said) State.appendStep(taskId, tagged(said.slice(0, 60)));
       Sound.play("finish");
       if (focused) surface("finished", true);
       else State.setPillBadge(taskId, "finished");
@@ -232,6 +247,7 @@ function handleHook(island: Island, payload: HookPayload) {
         State.setPillBadge(taskId, null);
       }, 5200);
       break;
+    }
 
     case "StopFailure":
       State.updateTask(taskId, "error");
