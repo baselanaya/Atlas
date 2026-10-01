@@ -1,0 +1,35 @@
+# PKGBUILD for Atlas — build from a released tag.
+#
+# For the AUR (as e.g. "atlas-companion"): put this file in the AUR repo with
+# the tag's tarball as source, then build and publish with makepkg.
+#
+# Depends on the usual Tauri/WebKitGTK stack at build time; runtime pulls
+# webkit2gtk-4.1, libayatana-appindicator and the GStreamer plugins.
+
+pkgname=atlas-companion
+pkgver=0.2.1
+pkgrel=1
+pkgdesc="A little ringed planet that watches your Claude Code, ZCode and Codex sessions"
+arch=('x86_64')
+url="https://github.com/baselanaya/Atlas"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'libayatana-appindicator' 'gtk3' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good' 'gst-libav' 'xdg-utils')
+makedepends=('rust' 'nodejs>=20' 'npm' 'libx11' 'libxext')
+source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('SKIP')  # fill in from the published tag when publishing to the AUR
+
+build() {
+  cd "${srcdir}/Atlas-${pkgver}"
+  export npm_config_install_links=false
+  npm install --no-fund --no-audit
+  npx tauri build --bundles deb
+  mkdir -p "${srcdir}/extract"
+  bsdtar -xf target/release/bundle/deb/*.deb -C "${srcdir}/extract"
+  bsdtar -xf "${srcdir}/extract"/data.tar.* -C "${srcdir}/extract"
+}
+
+package() {
+  cd "${srcdir}/extract"
+  cp -a usr "${pkgdir}/"
+  install -Dm644 "${srcdir}/Atlas-${pkgver}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

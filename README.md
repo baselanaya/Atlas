@@ -1,10 +1,14 @@
 <div align="center">
 
+<img src="src-tauri/icons/icon.png" width="110" alt="Atlas">
+
 # Atlas
 
 **A little ringed planet that lives at the top of your screen and watches your coding agents work.**
 
 Approve permissions, set access levels, watch sessions, drop a file, chat — without leaving what you're doing.
+
+<img src="media/screenshot.png" width="480" alt="Atlas in action">
 
 ![Linux](https://img.shields.io/badge/Linux-KDE%20%2F%20X11-1793D1?logo=linux)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)

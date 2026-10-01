@@ -46,38 +46,31 @@ function agentTag(agent: string | undefined): string {
   return agent && agent !== "claude" ? agent : "";
 }
 
-const PROJECT_ALIASES: Record<string, string> = {
-  "notch-buddy": "Notch Buddy",
-  notchbuddy: "Notch Buddy",
-  notch_buddy: "Notch Buddy",
-};
-
-function aliasProjectName(name: string): string {
-  return PROJECT_ALIASES[name.toLowerCase()] ?? name;
-}
-
 function lastPathComponent(p: string): string {
   const cleaned = p.replace(/[\\/]+$/, "");
   const idx = Math.max(cleaned.lastIndexOf("\\"), cleaned.lastIndexOf("/"));
   return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
 }
 
-/** frenchStep() — same labels as the macOS app. */
 const TOOL_LABELS: Record<string, string> = {
-  Bash: "Exécute",
-  Read: "Lit",
-  Write: "Écrit",
-  Edit: "Modifie",
-  Glob: "Cherche",
-  Grep: "Recherche",
-  WebSearch: "Recherche web",
-  WebFetch: "Récupère",
-  TodoWrite: "Tâches",
+  Bash: "Runs",
+  Read: "Reads",
+  Write: "Writes",
+  Edit: "Edits",
+  Glob: "Finds",
+  Grep: "Greps",
+  WebSearch: "Searches web",
+  WebFetch: "Fetches",
+  TodoWrite: "Todos",
   Task: "Agent",
-  LS: "Liste",
-  MultiEdit: "Modifie",
+  Agent: "Agent",
+  LS: "Lists",
+  MultiEdit: "Edits",
   NotebookEdit: "Notebook",
-  PowerShell: "Exécute",
+  PowerShell: "Runs",
+  Shell: "Runs",
+  apply_patch: "Patches",
+  Exit: "Runs",
 };
 
 function stepLabel(tool: string, input: Record<string, unknown>): string {
@@ -158,7 +151,7 @@ function handleHook(island: Island, payload: HookPayload) {
   const name = payload.hook_event_name ?? "";
   const cwd = payload.cwd ?? "";
   const raw = lastPathComponent(cwd);
-  const projectName = aliasProjectName(raw || "Session");
+  const projectName = raw || "Session";
   // When two harnesses run at once their pills keep their own timelines; the
   // tag marks the shared surfaces (the approval card).
   const tag = agentTag(payload.agent);
@@ -218,7 +211,7 @@ function handleHook(island: Island, payload: HookPayload) {
     case "Notification": {
       const message = payload.message ?? "";
       const lower = message.toLowerCase();
-      if (lower.includes("rate limit") || lower.includes("limite d")) {
+      if (lower.includes("rate limit")) {
         State.updateTask(taskId, "ratelimit");
         Sound.play("rate");
       } else if (message.endsWith("?")) {
