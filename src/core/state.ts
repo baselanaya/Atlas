@@ -75,6 +75,13 @@ export const INTEGRATION_AGENTS: AgentTask[] = [
 /** The coding-agent pills: always present, one per harness, never toggled off. */
 export const AGENT_TASK_IDS = ["integration_claude", "integration_zcode", "integration_codex"];
 
+/** Pill id → harness id, the key used in settings.disabledAgents. */
+export const AGENT_ID: Record<string, string> = {
+  integration_claude: "claude",
+  integration_zcode: "zcode",
+  integration_codex: "codex",
+};
+
 export function isAgentTask(id: string): boolean {
   return AGENT_TASK_IDS.includes(id);
 }
@@ -129,6 +136,8 @@ export interface Settings {
   voiceSpeakEvents: boolean;
   mcpEnabled: boolean;
   mcpPort: number;
+  /** Harness ids switched off by the user ("claude", "zcode", "codex"). */
+  disabledAgents: string[];
   notifyEnabled: boolean;
 }
 
@@ -153,6 +162,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceSpeakEvents: true,
   mcpEnabled: false,
   mcpPort: 17510,
+  disabledAgents: [],
   notifyEnabled: true,
 };
 
@@ -250,8 +260,10 @@ class AppState {
   /** loadIntegrationTasks() — agent pills always on, services opt-in (max 4). */
   loadIntegrationTasks() {
     for (const proto of INTEGRATION_AGENTS) {
-      const shouldLoad =
-        isAgentTask(proto.id) || this.settings.activeIntegrations.includes(proto.id);
+      const switchedOff =
+        isAgentTask(proto.id) && this.settings.disabledAgents.includes(AGENT_ID[proto.id]);
+      const shouldLoad = !switchedOff &&
+        (isAgentTask(proto.id) || this.settings.activeIntegrations.includes(proto.id));
       const idx = this.tasks.findIndex((t) => t.id === proto.id);
       if (shouldLoad && idx < 0) this.tasks.push({ ...proto, steps: [] });
       if (!shouldLoad && idx >= 0) this.tasks.splice(idx, 1);

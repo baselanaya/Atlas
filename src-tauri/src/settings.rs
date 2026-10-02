@@ -63,6 +63,11 @@ pub struct Settings {
     /// System notifications for approvals and errors.
     #[serde(default = "default_true")]
     pub notify_enabled: bool,
+    /// Agents the user switched off: their pills hide, their events are
+    /// ignored (permission requests fall straight back to the terminal),
+    /// their hooks stay installed until explicitly uninstalled.
+    #[serde(default)]
+    pub disabled_agents: Vec<String>,
 }
 
 fn default_mcp_port() -> u16 {
@@ -114,6 +119,7 @@ impl Default for Settings {
             mcp_enabled: false,
             mcp_port: default_mcp_port(),
             notify_enabled: true,
+            disabled_agents: Vec::new(),
         }
     }
 }

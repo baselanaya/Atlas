@@ -196,8 +196,14 @@ fn call_tool(app: &AppHandle, name: &str, args: &Value) -> String {
         "atlas_status" => {
             let snap = crate::stats::snapshot_json(1);
             let today = snap.as_object().and_then(|o| o.values().next().cloned()).unwrap_or(json!({}));
+            let disabled = {
+                let shared = app.state::<crate::Shared>();
+                let disabled = shared.settings.lock().unwrap().disabled_agents.clone();
+                disabled
+            };
             serde_json::to_string_pretty(&json!({
                 "agents": today.get("agents").cloned().unwrap_or(json!({})),
+                "disabled": disabled,
             }))
             .unwrap_or_default()
         }

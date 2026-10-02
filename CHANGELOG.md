@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 — 2026-10-02
+
+- **Per-agent on/off switch** — every agent section in Settings has an
+  Enabled toggle. A switched-off harness has no pill, its events are
+  ignored, and its permission requests decline instantly so the terminal
+  asks instead — the agent is never left waiting. Hooks stay installed
+  until explicitly uninstalled; `atlas_status` reports the disabled list.
+- **Atlas-Lite voice profile** — Kokoro (Bella): 6 s cold including model
+  load, ~1 s warm, a few hundred MB of VRAM. The featherweight option
+  next to your clone (Chatterbox) and Serena (Qwen3-TTS).
+
 ## 0.8.0 — 2026-10-02
 
 The voice pipeline, optimized end to end.

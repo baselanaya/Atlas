@@ -60,6 +60,19 @@ function agentSection(status: HookStatus): HTMLElement {
     body,
   );
 
+  // The off switch: events ignored, pill hidden, permission requests fall
+  // straight back to the terminal. Hooks stay put until uninstalled below —
+  // switching a harness off shouldn't silently rewrite its config.
+  const harness = status.agent;
+  const isOff = () => settings.disabledAgents.includes(harness);
+  const offToggle = toggle(isOff(), (on) => {
+    settings.disabledAgents = on
+      ? [...new Set([...settings.disabledAgents, harness])]
+      : settings.disabledAgents.filter((a) => a !== harness);
+    void save();
+    draw();
+  });
+
   const rebuild = async () => {
     const fresh = await Bridge.hooksStatus(status.agent);
     if (fresh) Object.assign(status, fresh);
@@ -72,6 +85,10 @@ function agentSection(status: HookStatus): HTMLElement {
 
   function draw() {
     body.append(
+      h("div", { class: "row" },
+        h("label", { text: isOff() ? "Disabled — events ignored" : "Enabled" }),
+        offToggle,
+      ),
       h("div", {
         class: "hint",
         text: status.installed

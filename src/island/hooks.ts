@@ -167,6 +167,14 @@ export function registerHookHandlers(island: Island) {
 }
 
 function handleHook(island: Island, payload: HookPayload) {
+  // A switched-off agent is invisible: its events change nothing, and a
+  // permission request is declined on the spot so its terminal asks instead.
+  const harness = payload.agent ?? "claude";
+  if (State.settings.disabledAgents.includes(harness)) {
+    if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
+    return;
+  }
+
   if (State.paused) {
     // Silence here used to cost Claude Code nearly two minutes: the relay waited
     // for a decision from an island that had already decided not to look. Say so,
