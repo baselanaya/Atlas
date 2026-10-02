@@ -49,6 +49,25 @@ function maybeSpeak(line: string) {
   void Bridge.voiceSpeak(line);
 }
 
+/**
+ * The spoken version of a permission request: what the agent needs and why,
+ * in as few words as a person would use. "ZCode needs to run npm install."
+ * — never "Bash · npm install", which is a label, not a sentence.
+ */
+function spokenRequest(agent: string, tool: string, input: Record<string, unknown>): string {
+  const s = (k: string) => (typeof input[k] === "string" ? (input[k] as string) : "");
+  const words = (t: string, n: number) => t.trim().split(/\s+/).slice(0, n).join(" ");
+  const what =
+    (s("command") && `run ${words(s("command"), 12)}`) ||
+    (s("file_path") && `${tool === "Edit" || tool === "MultiEdit" || tool === "NotebookEdit" ? "edit" : "write"} ${lastPathComponent(s("file_path"))}`) ||
+    (s("path") && `read ${lastPathComponent(s("path"))}`) ||
+    (s("url") && `open ${words(s("url"), 3)}`) ||
+    (s("query") && `search for ${words(s("query"), 8)}`) ||
+    (s("pattern") && `search the code for ${words(s("pattern"), 6)}`) ||
+    `use ${tool}`;
+  return `${agent} needs to ${what}.`;
+}
+
 /** Short tag for steps and the approval card when the event isn't Claude's. */
 function agentTag(agent: string | undefined): string {
   return agent && agent !== "claude" ? agent : "";
@@ -246,7 +265,7 @@ function handleHook(island: Island, payload: HookPayload) {
       State.updateTask(taskId, "finished");
       if (said) State.appendStep(taskId, tagged(said.slice(0, 60)));
       Sound.play("finish");
-      maybeSpeak(`${projectName} finished`);
+      maybeSpeak(`${projectName} finished.`);
       if (focused) surface("finished", true);
       else State.setPillBadge(taskId, "finished");
       window.setTimeout(() => {
@@ -299,7 +318,7 @@ function handleHook(island: Island, payload: HookPayload) {
       // The relay's short ack window closes in 800 ms; everything below this
       // line is synchronous, so the card really is up by the time it lands.
       if (requestId) void Bridge.approvalAck(requestId);
-      maybeSpeak(`${agentName} asks to ${target}`.slice(0, 160));
+      maybeSpeak(spokenRequest(agentName, tool, input));
       State.updateTask(taskId, "approval");
       State.isPinned = true;
       Sound.play("approval");
