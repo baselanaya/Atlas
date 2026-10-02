@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.0 — 2026-10-02
+
+Built from research into what the ecosystem's most-loved tools offer
+(CodexBar, caut, TokenTracker, claude-usage, NotchNook user feedback):
+
+- **Rate limit window tracker** — input tokens per agent in the rolling
+  5-hour subscription window, with a visual bar and a warning past 85%.
+  Reads the same transcripts as the daily stats, mtime-filtered for speed.
+- **Stats charts** — a canvas bar chart in Settings → Stats: one stacked
+  bar per day (last 7), colored per agent, drawn with zero dependencies.
+- **Keyboard shortcuts** — `A` to approve, `D` to deny when the approval
+  card is on screen; `Esc` still closes the island.
+
 ## 0.9.2 — 2026-10-02
 
 - **The island actually sits at the top now.** The real bug, found at last:

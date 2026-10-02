@@ -46,4 +46,6 @@ export const STR = {
   sessions: fr ? "sessions" : "sessions",
   tools: fr ? "outils" : "tools",
   approvals: fr ? "approbations" : "approvals",
+  rateWindow: fr ? "Fenêtre 5h" : "5h window",
+  rateWarn: fr ? "approche de la limite" : "approaching limit",
 } as const;

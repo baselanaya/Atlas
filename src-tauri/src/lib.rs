@@ -264,6 +264,11 @@ fn stats_snapshot(days: Option<usize>) -> serde_json::Value {
 }
 
 #[tauri::command]
+fn window_usage() -> serde_json::Value {
+    serde_json::to_value(tokens::window_usage()).unwrap_or_default()
+}
+
+#[tauri::command]
 fn tokens_snapshot(days: Option<usize>) -> serde_json::Value {
     serde_json::to_value(tokens::scan(days.unwrap_or(7).clamp(1, 60))).unwrap_or_default()
 }
@@ -574,6 +579,7 @@ pub fn run() {
             mcp_status,
             stats_snapshot,
             tokens_snapshot,
+            window_usage,
             hooks_status,
             hooks_statuses,
             hooks_preview,

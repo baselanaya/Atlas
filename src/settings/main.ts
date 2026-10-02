@@ -461,10 +461,66 @@ function notificationsSection(): HTMLElement {
   );
 }
 
+// ── Rate limit section ────────────────────────────────────────────────────────
+
+/** The plans users actually have, as rough input-token ceilings per 5h. */
+const PLAN_LIMITS: Record<string, number> = {
+  claude: 200_000,   // Pro 5h input ceiling, generous estimate
+  codex: 150_000,    // ChatGPT Plus Codex 5h, estimate
+};
+
+function rateLimitSection(): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
+
+  void (async () => {
+    const usage = await Bridge.windowUsage();
+    if (!usage) return;
+    const disabled = settings.disabledAgents ?? [];
+    for (const [agent, tokens] of Object.entries(usage)) {
+      if (disabled.includes(agent) || tokens === 0) continue;
+      const limit = PLAN_LIMITS[agent] ?? 200_000;
+      const pct = Math.min(100, (tokens / limit) * 100);
+      const color = pct > 85 ? "#F4505E" : pct > 60 ? "#F29B38" : "#22C55E";
+      const bar = h("div", {
+        style: `height:8px;border-radius:4px;background:#1a1a2e;overflow:hidden;flex:1`,
+      });
+      bar.append(h("div", {
+        style: `height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width 0.3s`,
+      }));
+      body.append(
+        h("div", { class: "row" },
+          h("label", { text: agent }),
+          h("span", { class: "hint", text: `${(tokens / 1000).toFixed(0)}k / ${(limit / 1000).toFixed(0)}k` }),
+        ),
+        bar,
+      );
+      if (pct > 85) {
+        body.append(h("div", { class: "notice warn", text: `${agent} ${STR.rateWarn} (${pct.toFixed(0)}%)` }));
+      }
+    }
+    if (!body.children.length) {
+      body.append(h("div", { class: "hint", text: "No usage in the last 5 hours." }));
+    }
+  })();
+
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: STR.rateWindow })),
+    body,
+    h("div", { class: "hint", text: "Input tokens in the rolling 5h subscription window. Limits are estimates — your plan may differ." }),
+  );
+}
+
 // ── Stats section ──────────────────────────────────────────────────────────────
 
 function statsSection(): HTMLElement {
   const body = h("div", { style: "display:flex;flex-direction:column;gap:6px" });
+  const chart = h("canvas", {
+    width: 520,
+    height: 120,
+    style: "width:100%;max-width:520px;height:120px;border-radius:8px;background:#0d0d1a",
+  }) as HTMLCanvasElement;
   void (async () => {
     const snap = await Bridge.statsSnapshot(7);
     if (!snap) return;
@@ -481,6 +537,35 @@ function statsSection(): HTMLElement {
     }
     if (days.length === 0) body.append(h("div", { class: "hint", text: "—" }));
 
+    // Simple bar chart: one bar per day, stacked per agent.
+    void (async () => {
+      const snap = await Bridge.tokensSnapshot(7);
+      if (!snap) return;
+      const ctx = chart.getContext("2d");
+      if (!ctx) return;
+      const days = Object.entries(snap as Record<string, Record<string, { input: number; output: number }>>)
+        .sort((a, b) => a[0].localeCompare(b[0]));
+      if (!days.length) return;
+      const max = Math.max(...days.map(([, agents]) =>
+        Object.values(agents).reduce((s, t) => s + t.input + t.output, 0)));
+      if (max === 0) return;
+      const colors: Record<string, string> = { claude: "#D97757", zcode: "#6E7BF2", codex: "#10A37F" };
+      const bw = chart.width / days.length;
+      days.forEach(([day, agents], i) => {
+        let y = chart.height;
+        for (const [agent, t] of Object.entries(agents)) {
+          const h = ((t.input + t.output) / max) * (chart.height - 20);
+          ctx.fillStyle = colors[agent] ?? "#8e939c";
+          ctx.fillRect(i * bw + 8, y - h, bw - 16, h);
+          y -= h;
+        }
+        ctx.fillStyle = "#8e939c";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(day.slice(5), i * bw + bw / 2, chart.height - 4);
+      });
+    })();
+
     // Tokens come from the agents' own transcripts, not from Atlas.
     const tokens = await Bridge.tokensSnapshot(7);
     const tdays = Object.entries((tokens ?? {}) as Record<string, Record<string, { input: number; output: number; cache_read: number }>>)
@@ -494,7 +579,7 @@ function statsSection(): HTMLElement {
       ));
     }
   })();
-  return h("section", {}, h("h2", {}, h("span", { text: STR.stats })), body);
+  return h("section", {}, h("h2", {}, h("span", { text: STR.stats })), chart, body);
 }
 
 // ── Integrations section ──────────────────────────────────────────────────────
@@ -686,6 +771,7 @@ async function main() {
     apiSection(hasKey),
     voiceSection(),
     mcpSection(),
+    rateLimitSection(),
     notificationsSection(),
     statsSection(),
     integrationsSection(present),

@@ -31,6 +31,104 @@ impl Tokens {
 
 pub type TokenDays = BTreeMap<String, BTreeMap<String, Tokens>>;
 
+/// What the last 5 hours looked like per agent — the subscription window
+/// Claude Code and Codex actually enforce. Input tokens only; cache reads are
+/// nearly free on every plan.
+#[derive(Serialize, Default)]
+pub struct WindowUsage {
+    pub agents: BTreeMap<String, u64>,
+}
+
+pub fn window_usage() -> WindowUsage {
+    let cutoff = now_minus_hours(5);
+    let mut out = WindowUsage::default();
+
+    window_claude(&mut out, &cutoff);
+    window_codex(&mut out, &cutoff);
+    out
+}
+
+/// "YYYY-MM-DDTHH" — hour precision is plenty for a 5-hour window.
+fn now_minus_hours(hours: i32) -> String {
+    let t = crate::log::LocalTime::now();
+    let (y, m, d) = days_back(t.year, t.month as i32, t.day as i32, 0);
+    let mut h = t.hour as i32 - hours;
+    let (y, m, d) = if h < 0 {
+        h += 24;
+        let (ny, nm, nd) = days_back(y, m, d, 1);
+        (ny, nm, nd)
+    } else {
+        (y, m, d)
+    };
+    format!("{y:04}-{m:02}-{d:02}T{h:02}")
+}
+
+fn window_claude(out: &mut WindowUsage, cutoff: &str) {
+    let root = home().join(".claude").join("projects");
+    let Ok(entries) = std::fs::read_dir(&root) else { return };
+    for project in entries.flatten() {
+        let Ok(files) = std::fs::read_dir(project.path()) else { continue };
+        for file in files.flatten() {
+            let path = file.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
+            // Cheap filter: only files modified in the last 6 hours.
+            if let Ok(meta) = std::fs::metadata(&path) {
+                if let Ok(modified) = meta.modified() {
+                    if modified.elapsed().map(|e| e.as_secs() > 6 * 3600).unwrap_or(true) {
+                        continue;
+                    }
+                }
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            for line in text.lines() {
+                let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+                let Some(usage) = v.pointer("/message/usage") else { continue };
+                let ts = v.get("timestamp").and_then(Value::as_str).unwrap_or("");
+                if ts < cutoff { continue; }
+                let input = usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
+                *out.agents.entry("claude".into()).or_default() += input;
+            }
+        }
+    }
+}
+
+fn window_codex(out: &mut WindowUsage, cutoff: &str) {
+    let root = home().join(".codex").join("sessions");
+    let Ok(years) = std::fs::read_dir(&root) else { return };
+    for y in years.flatten() {
+        let Ok(months) = std::fs::read_dir(y.path()) else { continue };
+        for m in months.flatten() {
+            let Ok(days_) = std::fs::read_dir(m.path()) else { continue };
+            for d in days_.flatten() {
+                let Ok(files) = std::fs::read_dir(d.path()) else { continue };
+                for file in files.flatten() {
+                    let path = file.path();
+                    if path.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
+                    if let Ok(meta) = std::fs::metadata(&path) {
+                        if let Ok(modified) = meta.modified() {
+                            if modified.elapsed().map(|e| e.as_secs() > 6 * 3600).unwrap_or(true) {
+                                continue;
+                            }
+                        }
+                    }
+                    let Ok(text) = std::fs::read_to_string(&path) else { continue };
+                    let mut last: Option<Value> = None;
+                    for line in text.lines() {
+                        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+                        if let Some(u) = v.pointer("/payload/info/total_token_usage") {
+                            last = Some(u.clone());
+                        }
+                    }
+                    if let Some(u) = last {
+                        let input = u.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
+                        *out.agents.entry("codex".into()).or_default() += input;
+                    }
+                }
+            }
+        }
+    }
+}
+
 static CACHE: Mutex<Option<(Instant, usize, TokenDays)>> = Mutex::new(None);
 
 /// The last `days` days of per-agent token usage, cached for a minute —

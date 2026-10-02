@@ -69,6 +69,7 @@ export const Bridge = {
   mcpStatus: () => call<{ enabled: boolean; port: number; running: boolean }>("mcp_status"),
   statsSnapshot: (days: number) => call<Record<string, unknown>>("stats_snapshot", { days }),
   tokensSnapshot: (days: number) => call<Record<string, unknown>>("tokens_snapshot", { days }),
+  windowUsage: () => call<Record<string, number>>("window_usage"),
   voiceSpeak: (text: string) => call<void>("voice_speak", { text }),
 
   // ── Access levels (Claude Code, Codex; zcode is per-session) ─────────────

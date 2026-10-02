@@ -32,6 +32,8 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
+// Keyboard: A = Allow, D = Deny, Esc = close — the shortcuts the approval
+// card deserves when your hands are already on the keyboard.
 export class Island {
   readonly fsm = new IslandStateMachine();
 
@@ -545,6 +547,33 @@ export class Island {
     });
 
     window.addEventListener("keydown", (e) => {
+      // A/D answer the approval card without reaching for the mouse; the
+      // shortcut only exists while the card is actually on screen.
+      if (State.pendingApproval) {
+        const key = e.key.toLowerCase();
+        if (key === "a") {
+          const id = State.pendingApproval.requestId;
+          State.pendingApproval = null;
+          State.isPinned = false;
+          this.dropPin();
+          State.updateTask("integration_claude", "working");
+          if (id) void Bridge.approvalDecision(id, "allow");
+          Sound.play("approve");
+          State.notify();
+          return;
+        }
+        if (key === "d") {
+          const id = State.pendingApproval.requestId;
+          State.pendingApproval = null;
+          State.isPinned = false;
+          this.dropPin();
+          State.updateTask("integration_claude", "working");
+          if (id) void Bridge.approvalDecision(id, "deny");
+          Sound.play("close");
+          State.notify();
+          return;
+        }
+      }
       if (e.key === "Escape" && State.mode === "expanded" && !State.isPinned) this.collapse();
       State.lastActivity = performance.now();
     });
