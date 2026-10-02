@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 — 2026-10-02
+
+- Voice: the docker Voicebox is found automatically (port 17600 probed
+  alongside the desktop's 17493), and `/speak` resolves the profile by its
+  documented `profile` field. Verified end-to-end: a Codex permission request
+  reached the island and Atlas spoke the card out loud.
+- docs/voicebox.md: the docker deployment recipe (BuildKit flag, volume
+  ownership, host audio sockets, port map).
+
 ## 0.7.0 — 2026-10-02
 
 - **MCP over stdio** — `atlas --mcp-stdio` bridges stdin/stdout JSON-RPC to

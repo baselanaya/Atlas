@@ -13,7 +13,9 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use serde_json::Value;
 
-const BASE: &str = "http://127.0.0.1:17493";
+/// The desktop app serves 17493; the docker compose maps the same API to
+/// 17600 on the host. Whichever answers first wins, remembered for the call.
+const BASES: [&str; 2] = ["http://127.0.0.1:17493", "http://127.0.0.1:17600"];
 /// Identifies us to Voicebox, so its per-client voice bindings can target
 /// Atlas specifically.
 const CLIENT: &str = "atlas";
@@ -72,19 +74,18 @@ async fn probe(force: bool) -> VoiceStatus {
         }
     }
 
-    let status = match reqwest::Client::builder()
-        .timeout(Duration::from_millis(700))
-        .build()
-    {
-        Ok(client) => match client.get(format!("{BASE}/profiles")).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                let body = resp.text().await.unwrap_or_default();
-                VoiceStatus { available: true, profiles: parse_profiles(&body) }
+    let mut status = VoiceStatus { available: false, profiles: Vec::new() };
+    if let Ok(client) = reqwest::Client::builder().timeout(Duration::from_millis(700)).build() {
+        for base in BASES {
+            if let Ok(resp) = client.get(format!("{base}/profiles")).send().await {
+                if resp.status().is_success() {
+                    let body = resp.text().await.unwrap_or_default();
+                    status = VoiceStatus { available: true, profiles: parse_profiles(&body) };
+                    break;
+                }
             }
-            _ => VoiceStatus { available: false, profiles: Vec::new() },
-        },
-        Err(_) => VoiceStatus { available: false, profiles: Vec::new() },
-    };
+        }
+    }
 
     *CACHE.lock().unwrap() = Some(Cache { probed_at: Some(Instant::now()), status: status.clone() });
     status
@@ -106,41 +107,55 @@ pub async fn speak(text: &str, profile: &str) {
     };
     let mut body = serde_json::json!({ "text": text });
     if !profile.is_empty() {
-        body["profile_id"] = Value::String(profile.to_string());
+        // The API resolves `profile` by name or id — `profile_id` alone is a 400.
+        body["profile"] = Value::String(profile.to_string());
     }
-    let _ = client
-        .post(format!("{BASE}/speak"))
-        .header("X-Voicebox-Client-Id", CLIENT)
-        .json(&body)
-        .send()
-        .await;
+    for base in BASES {
+        let _ = client
+            .post(format!("{base}/speak"))
+            .header("X-Voicebox-Client-Id", CLIENT)
+            .json(&body)
+            .send()
+            .await;
+    }
 }
 
 /// Audio → text, for the chat bubble's mic button. `audio_b64` is raw
 /// recorder output (webm/ogg), forwarded to Voicebox as-is.
 pub async fn transcribe(audio_b64: &str) -> Result<String, String> {
     let bytes = decode64(audio_b64)?;
-    let part = reqwest::multipart::Part::bytes(bytes)
-        .file_name("atlas.webm")
-        .mime_str("audio/webm")
-        .map_err(|e| e.to_string())?;
-    let form = reqwest::multipart::Form::new().part("file", part);
-
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
-    let resp = client
-        .post(format!("{BASE}/transcribe"))
-        .header("X-Voicebox-Client-Id", CLIENT)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|_| "Voicebox isn't running.".to_string())?;
-    if !resp.status().is_success() {
-        return Err(format!("Voicebox transcribe failed ({})", resp.status()));
+    let mut last_err = String::from("Voicebox isn't running.");
+    for base in BASES {
+        let part = reqwest::multipart::Part::bytes(bytes.clone())
+            .file_name("atlas.webm")
+            .mime_str("audio/webm")
+            .map_err(|e| e.to_string())?;
+        let form = reqwest::multipart::Form::new().part("file", part);
+        match client
+            .post(format!("{base}/transcribe"))
+            .header("X-Voicebox-Client-Id", CLIENT)
+            .multipart(form)
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                let v: Value = resp.json().await.map_err(|e| e.to_string())?;
+                return transcribe_value(v);
+            }
+            Ok(resp) => {
+                last_err = format!("Voicebox transcribe failed ({})", resp.status());
+            }
+            Err(_) => continue,
+        }
     }
-    let v: Value = resp.json().await.map_err(|e| e.to_string())?;
+    return Err(last_err);
+}
+
+fn transcribe_value(v: Value) -> Result<String, String> {
     let text = ["text", "transcript", "content"]
         .iter()
         .find_map(|k| v.get(*k).and_then(Value::as_str))

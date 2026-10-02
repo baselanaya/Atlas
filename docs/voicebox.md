@@ -57,3 +57,34 @@ codex exec "Use the atlas_status tool and report what the agents are doing."
 ```
 
 `ATLAS_MCP_PORT` overrides the port the bridge forwards to.
+
+
+## Running Voicebox in docker (what worked here)
+
+The desktop builds don't cover every distro; `docker compose up` does, with
+four local adjustments on a classic-builder daemon:
+
+1. `Dockerfile`: `COPY --chmod=755 …` → plain `COPY` + `RUN chmod 755 …`
+   (BuildKit-only flag otherwise).
+2. After first start: `docker exec voicebox chown -R voicebox:voicebox /home/voicebox/.cache`
+   (the named volume starts root-owned) and `docker exec voicebox chmod 777 /app/data/generations`
+   (the bind mount the WAVs land in).
+3. A `docker-compose.override.yml` passing the host audio sockets:
+
+   ```yaml
+   services:
+     voicebox:
+       environment:
+         - XDG_RUNTIME_DIR=/tmp/xdg
+         - PULSE_SERVER=unix:/tmp/xdg/pulse/native
+       volumes:
+         - /run/user/1000/pulse/native:/tmp/xdg/pulse/native
+         - /run/user/1000/pipewire-0:/tmp/xdg/pipewire-0
+   ```
+
+4. The compose maps the API to host port **17600**; Atlas probes 17493 (desktop
+   install) and 17600 (docker) and uses whichever answers.
+
+Create a profile once (or in the UI): `POST /profiles {"name":"Atlas",
+"voice_type":"preset","preset_engine":"kokoro","preset_voice_id":"af_alloy"}`,
+pick it in Settings → Voice → Voice, and the island talks.

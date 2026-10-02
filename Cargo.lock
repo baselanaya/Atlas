@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "atlas"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "keyring",
  "libc",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "atlas-hook"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "serde_json",
  "windows 0.61.3",

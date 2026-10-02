@@ -1,0 +1,11 @@
+services:
+  voicebox:
+    environment:
+      - XDG_RUNTIME_DIR=/tmp/xdg
+      - PULSE_SERVER=unix:/tmp/xdg/pulse/native
+    volumes:
+      - ./output:/app/data/generations
+      - voicebox-data:/app/data
+      - huggingface-cache:/home/voicebox/.cache/huggingface
+      - /run/user/1000/pulse/native:/tmp/xdg/pulse/native
+      - /run/user/1000/pipewire-0:/tmp/xdg/pipewire-0
