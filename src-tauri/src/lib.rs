@@ -607,9 +607,15 @@ pub fn run() {
                     let scale = island::screen_info(&handle, "primary").scale;
                     let width = island::screen_info(&handle, "primary").width;
                     let margin = ((width - island::PANEL_W) / 2.0).round() as i32;
+                    let top = {
+                        let shared = handle.state::<Shared>();
+                        let top = shared.settings.lock().unwrap().island_margin_top;
+                        top
+                    };
                     let ok = layershell::try_init(
                         gtk_win,
                         margin,
+                        top,
                         (island::PANEL_W * scale).round() as i32,
                         (island::PANEL_H * scale).round() as i32,
                     );

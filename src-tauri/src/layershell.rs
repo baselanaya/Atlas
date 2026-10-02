@@ -51,7 +51,7 @@ fn open_library() -> Option<*mut std::ffi::c_void> {
 /// horizontally centered by a left margin, on the overlay layer. Must run
 /// before the window is mapped. Returns false when anything is missing, in
 /// which case the caller logs and the island behaves like a plain window.
-pub fn try_init(window: CWindow, center_margin: i32, width: i32, height: i32) -> bool {
+pub fn try_init(window: CWindow, center_margin: i32, margin_top: i32, width: i32, height: i32) -> bool {
     let Some(lib) = open_library() else {
         crate::log::line("layer-shell: library not found — island runs as a plain window".to_string());
         return false;
@@ -87,7 +87,7 @@ pub fn try_init(window: CWindow, center_margin: i32, width: i32, height: i32) ->
         set_layer(window, LAYER_OVERLAY);
         set_anchor(window, EDGE_TOP, 1);
         set_anchor(window, EDGE_LEFT, 1);
-        set_margin(window, EDGE_TOP, 0);
+        set_margin(window, EDGE_TOP, margin_top.max(0));
         set_margin(window, EDGE_LEFT, center_margin.max(0));
         // Not a panel: never reserve screen space.
         set_zone(window, -1);

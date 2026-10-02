@@ -63,6 +63,10 @@ pub struct Settings {
     /// System notifications for approvals and errors.
     #[serde(default = "default_true")]
     pub notify_enabled: bool,
+    /// Nudge for the island's top edge, in px — the escape hatch for
+    /// compositors with opinions about layer surfaces.
+    #[serde(default)]
+    pub island_margin_top: i32,
     /// Agents the user switched off: their pills hide, their events are
     /// ignored (permission requests fall straight back to the terminal),
     /// their hooks stay installed until explicitly uninstalled.
@@ -119,6 +123,7 @@ impl Default for Settings {
             mcp_enabled: false,
             mcp_port: default_mcp_port(),
             notify_enabled: true,
+            island_margin_top: 0,
             disabled_agents: Vec::new(),
         }
     }

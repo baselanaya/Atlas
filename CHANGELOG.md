@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.1 — 2026-10-02
+
+- **Island top-margin setting** (`islandMarginTop`, default 8) — the layer
+  surface's top nudge, verified pixel-exact (margin 200 → island at y=201),
+  and the escape hatch for any compositor with opinions. Diagnostics along
+  the way confirmed anchors and margins were honored; the "misplaced island"
+  reports traced to fallback boots and a KDE panel being mistaken for the
+  island in screenshots.
+- Reference voice: **Atlas-Lite is now Kokoro/Heart** — ~3 s warm, tiny
+  footprint.
+
 ## 0.9.0 — 2026-10-02
 
 - **Per-agent on/off switch** — every agent section in Settings has an
