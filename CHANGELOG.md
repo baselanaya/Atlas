@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.2 — 2026-10-02
+
+- **The island actually sits at the top now.** The real bug, found at last:
+  Tauri mapped the island window before setup ran, and layer-shell only
+  takes on a window that has never been mapped — so the island stayed a
+  plain window the compositor centered. The window is now created hidden,
+  the layer surface is initialized, and only then is it shown. Verified by
+  screenshot: top edge, horizontally centered, character visible.
+
 ## 0.9.1 — 2026-10-02
 
 - **Island top-margin setting** (`islandMarginTop`, default 8) — the layer
