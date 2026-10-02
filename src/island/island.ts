@@ -2,7 +2,7 @@
 // Mirrors IslandRootView.swift + IslandWindowController.swift.
 
 import { Tracked, Spring, clamp } from "../core/anim";
-import { Bridge, IS_TAURI, onDragDrop } from "../core/bridge";
+import { Bridge, IS_TAURI, onDragDrop, onEvent } from "../core/bridge";
 import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
@@ -579,6 +579,18 @@ export class Island {
     });
 
     void onDragDrop((e) => this.onDragDrop(e));
+
+    // Achievements arrive as a burst of joy, not a wall of toasts.
+    void onEvent<{ id: string; name: string; emote: string; sound: string }>(
+      "achievement",
+      (a) => {
+        Sound.play(a.sound);
+        this.engine.triggerEmote(a.emote as never, 3200);
+        // The emote itself is the toast: love hearts, a proud smile — the
+        // character celebrates, not a text box.
+        void Bridge.achievementCelebrate(a.id);
+      },
+    );
 
     // Outside Tauri (plain browser) drive the cursor from DOM events so the
     // island can be inspected with `npm run dev`.

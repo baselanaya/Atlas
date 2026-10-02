@@ -141,6 +141,26 @@ pub fn persist() {
 
 /// The snapshot behind the Stats section and the MCP tools: the last `days`
 /// days, today first.
+/// Today's totals as a CheckContext for the achievement system.
+pub fn today_context() -> crate::achievements::CheckContext {
+    let stats = load();
+    let day = today();
+    let mut ctx = crate::achievements::CheckContext::default();
+    if let Some(today) = stats.days.get(&day) {
+        for (agent, s) in &today.agents {
+            ctx.total_sessions += s.sessions;
+            ctx.total_tool_calls += s.tool_calls;
+            ctx.total_approvals += s.approvals;
+            ctx.total_tokens += s.tool_calls * 2_000; // rough per-call estimate
+            ctx.agents_today.push(agent.clone());
+        }
+    }
+    let t = crate::log::LocalTime::now();
+    ctx.is_night = t.hour >= 0 && t.hour < 5;
+    ctx.is_early = t.hour >= 5 && t.hour < 7;
+    ctx
+}
+
 pub fn snapshot_json(days: usize) -> Value {
     let stats = load();
     let mut keys: Vec<&String> = stats.days.keys().collect();

@@ -202,6 +202,16 @@ where
 
     crate::stats::record(&agent, &event, None);
 
+    // Achievements fire on the events that mean something happened.
+    if matches!(event.as_str(), "SessionStart" | "PreToolUse" | "PermissionRequest" | "Stop") {
+        let ctx = crate::stats::today_context();
+        if let Some(ach) = crate::achievements::check(&ctx) {
+            log::line(format!("achievement: {} — {}", ach.name, ach.description));
+            let _ = app.emit_to(WINDOW_LABEL, "achievement",
+                serde_json::json!({ "id": ach.id, "name": ach.name, "emote": ach.emote, "sound": ach.sound }));
+        }
+    }
+
     if event != "PermissionRequest" {
         log::line(format!("hook {event}"));
         let _ = app.emit_to(WINDOW_LABEL, "hook", payload);

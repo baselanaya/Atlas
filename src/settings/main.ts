@@ -461,6 +461,41 @@ function notificationsSection(): HTMLElement {
   );
 }
 
+// ── Achievements section ───────────────────────────────────────────────────────
+
+function achievementsSection(): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:6px" });
+
+  void (async () => {
+    const list = (await Bridge.achievementsList()) as Array<{
+      name: string; description: string; unlocked: string | null; isNew: boolean;
+    }>;
+    if (!list) return;
+    for (const a of list) {
+      const unlocked = !!a.unlocked;
+      const row = h("div", {
+        class: "row",
+        style: unlocked ? "" : "opacity:0.45",
+      },
+        h("span", { text: unlocked ? (a.isNew ? "✨" : "✓") : "·" }),
+        h("label", { text: a.name, style: "min-width:110px" }),
+        h("span", { class: "hint", text: a.description }),
+        unlocked ? h("span", { class: "hint", text: String(a.unlocked) }) : null,
+      );
+      body.append(row);
+    }
+    const count = list.filter((a) => a.unlocked).length;
+    body.prepend(h("div", { class: "hint", text: `${count} of ${list.length} unlocked` }));
+  })();
+
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: "Achievements" })),
+    body,
+  );
+}
+
 // ── Rate limit section ────────────────────────────────────────────────────────
 
 /** The plans users actually have, as rough input-token ceilings per 5h. */
@@ -570,6 +605,25 @@ function statsSection(): HTMLElement {
     const tokens = await Bridge.tokensSnapshot(7);
     const tdays = Object.entries((tokens ?? {}) as Record<string, Record<string, { input: number; output: number; cache_read: number }>>)
       .sort((a, b) => b[0].localeCompare(a[0]));
+
+    // Cost estimates — what the tokens would cost on the open API market.
+    // Subscriptions make this a "what if" number, not a bill.
+    const PRICES: Record<string, number> = {
+      claude: 3 / 1_000_000,
+      codex: 1.5 / 1_000_000,
+    };
+    let totalCost = 0;
+    for (const [, agents] of tdays.slice(0, 7)) {
+      for (const [agent, t] of Object.entries(agents)) {
+        totalCost += (t.input + t.output) * (PRICES[agent] ?? 0);
+      }
+    }
+    if (totalCost > 0) {
+      body.append(h("div", { class: "row" },
+        h("label", { text: "≈ API value" }),
+        h("span", { class: "hint", text: `$${totalCost.toFixed(2)} this week` }),
+      ));
+    }
     for (const [day, agents] of tdays.slice(0, 7)) {
       const cells = Object.entries(agents).map(([agent, t]) =>
         `${agent}: ${(t.input + t.output) / 1000 | 0}k tokens (${(t.cache_read / 1000) | 0}k cached)`);
@@ -772,6 +826,7 @@ async function main() {
     voiceSection(),
     mcpSection(),
     rateLimitSection(),
+    achievementsSection(),
     notificationsSection(),
     statsSection(),
     integrationsSection(present),

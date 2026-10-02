@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0 — 2026-10-02
+
+Wave 2 from the ecosystem research — the notch-app wishlist:
+
+- **Achievements** — twelve milestones the island celebrates with character
+  emotes and sounds: First Contact, Tool Collector, Kilo-tokens through
+  Millionaire, Gatekeeper, Air Traffic, Night Owl, Early Bird, Finding
+  Voice. Unlocked in Settings → Achievements; one at a time, never a wall
+  of toasts. Spoken aloud if voice is on.
+- **Cost estimates** — Settings → Stats shows what the week's tokens
+  would cost on the open API market ($X.XX), next to the subscription
+  reality.
+- Stats chart and rate limit bar from 0.10.0 round out the analytics.
+
 ## 0.10.0 — 2026-10-02
 
 Built from research into what the ecosystem's most-loved tools offer

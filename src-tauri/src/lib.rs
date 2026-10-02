@@ -1,6 +1,7 @@
 // Atlas — app wiring and the commands the island calls.
 
 mod access;
+mod achievements;
 mod agents;
 mod claude;
 mod files;
@@ -249,6 +250,28 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn set_paused(paused: bool) {
     integrations::set_paused(paused);
+}
+
+// ── Achievements ───────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn achievements_list() -> serde_json::Value {
+    achievements::list()
+}
+
+/// Fired from the relay path when an achievement unlocks: the character
+/// celebrates, the sound plays, and voice announces it if enabled.
+#[tauri::command]
+fn achievement_celebrate(shared: State<'_, Shared>, id: String) {
+    let (voice, profile, dir) = {
+        let settings = shared.settings.lock().unwrap();
+        (settings.voice_enabled, settings.voice_profile.clone(), settings.voice_output_dir.clone())
+    };
+    if voice {
+        tauri::async_runtime::spawn(async move {
+            crate::voice::speak(&format!("Achievement unlocked: {id}"), &profile, &dir).await;
+        });
+    }
 }
 
 // ── MCP-out / stats ────────────────────────────────────────────────────────────
@@ -580,6 +603,8 @@ pub fn run() {
             stats_snapshot,
             tokens_snapshot,
             window_usage,
+            achievements_list,
+            achievement_celebrate,
             hooks_status,
             hooks_statuses,
             hooks_preview,

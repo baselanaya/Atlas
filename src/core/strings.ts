@@ -48,4 +48,5 @@ export const STR = {
   approvals: fr ? "approbations" : "approvals",
   rateWindow: fr ? "Fenêtre 5h" : "5h window",
   rateWarn: fr ? "approche de la limite" : "approaching limit",
+  achievements: fr ? "Succès" : "Achievements",
 } as const;
