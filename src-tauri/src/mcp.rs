@@ -227,8 +227,13 @@ fn call_tool(app: &AppHandle, name: &str, args: &Value) -> String {
                 return "Voice is disabled in Atlas settings.".into();
             }
             let spoken = text.clone();
+            let dir = {
+                let shared = app.state::<crate::Shared>();
+                let dir = shared.settings.lock().unwrap().voice_output_dir.clone();
+                dir
+            };
             tauri::async_runtime::spawn(async move {
-                crate::voice::speak(&spoken, &profile).await;
+                crate::voice::speak(&spoken, &profile, &dir).await;
             });
             format!("Speaking: {text}")
         }

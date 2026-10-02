@@ -51,6 +51,10 @@ pub struct Settings {
     /// Announce permission requests and finished sessions.
     #[serde(default = "default_true")]
     pub voice_speak_events: bool,
+    /// Where Voicebox's bind mount writes finished audio on the host; the
+    /// island plays from here because the container has no sound card.
+    #[serde(default)]
+    pub voice_output_dir: String,
     /// Atlas as an MCP server (127.0.0.1 only) — opt-in, like every service.
     #[serde(default)]
     pub mcp_enabled: bool,
@@ -106,6 +110,7 @@ impl Default for Settings {
             voice_profile: String::new(),
             voice_speak_chat: true,
             voice_speak_events: true,
+            voice_output_dir: String::new(),
             mcp_enabled: false,
             mcp_port: default_mcp_port(),
             notify_enabled: true,

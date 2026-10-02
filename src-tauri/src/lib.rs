@@ -284,15 +284,32 @@ async fn voice_status() -> voice::VoiceStatus {
 /// Spoken announcements (approvals, finishes), from the island's own events.
 #[tauri::command]
 async fn voice_speak(shared: State<'_, Shared>, text: String) -> Result<(), String> {
-    let (enabled, profile) = {
+    let (enabled, profile, dir) = {
         let settings = shared.settings.lock().unwrap();
-        (settings.voice_enabled, settings.voice_profile.clone())
+        (settings.voice_enabled, settings.voice_profile.clone(), settings.voice_output_dir.clone())
     };
     if !enabled {
         return Ok(());
     }
-    voice::speak(&text, &profile).await;
+    voice::speak(&text, &profile, &dir).await;
     Ok(())
+}
+
+/// Warms the voice pipeline at launch — model loaded, path proven — with one
+/// short word, so the first real announcement is never the cold one.
+pub fn voice_prewarm(app: &AppHandle) {
+    let (enabled, profile, dir) = {
+        let shared = app.state::<Shared>();
+        let settings = shared.settings.lock().unwrap();
+        (settings.voice_enabled, settings.voice_profile.clone(), settings.voice_output_dir.clone())
+    };
+    if !enabled {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+        voice::speak("Ready.", &profile, &dir).await;
+    });
 }
 
 // ── Access levels ──────────────────────────────────────────────────────────────
@@ -392,12 +409,17 @@ async fn chat_send(
     };
     let reply = claude::send(&chat, &model, &api_base, &route, query, context).await;
     if let Ok(text) = &reply {
-        let (enabled, profile, speak_chat) = {
+        let (enabled, profile, speak_chat, dir) = {
             let settings = shared.settings.lock().unwrap();
-            (settings.voice_enabled, settings.voice_profile.clone(), settings.voice_speak_chat)
+            (
+                settings.voice_enabled,
+                settings.voice_profile.clone(),
+                settings.voice_speak_chat,
+                settings.voice_output_dir.clone(),
+            )
         };
         if enabled && speak_chat {
-            voice::speak(&text.text, &profile).await;
+            voice::speak(&text.text, &profile, &dir).await;
         }
     }
     reply
@@ -623,6 +645,7 @@ pub fn run() {
                 crate::show_settings_window(&handle);
             }
             mcp::start_if_enabled(&handle);
+            voice_prewarm(&handle);
             Ok(())
         })
         .run(tauri::generate_context!())

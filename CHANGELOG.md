@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.0 — 2026-10-02
+
+The voice pipeline, optimized end to end.
+
+- **The island plays its own voice** — the Voicebox container has no audio
+  stack; Atlas now watches the finished WAV land in the bind-mounted output
+  directory and plays it on the host (PipeWire, PulseAudio fallback). Event
+  to audible: **~1 s warm**. Playback processes are reaped; one line at a
+  time (new announcements skip rather than queue).
+- **VRAM management** — before speaking, Atlas unloads whatever other TTS
+  engine is resident (an 8 GB card holds one), ending the CUDA-OOM class of
+  failures. Whisper is left alone.
+- **Launch warm-up** — Atlas says one word ("Ready.") a few seconds after
+  boot, so the first real announcement is never the cold one.
+- New setting: Voice → output directory (where Voicebox writes audio on the
+  host); empty disables host playback.
+- Deployment recipe gains `gcc`/`libc6-dev` in the image (Triton compiles on
+  first run), a persistent Triton cache volume, and
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` for the 8 GB card.
+
 ## 0.7.1 — 2026-10-02
 
 - Voice: the docker Voicebox is found automatically (port 17600 probed

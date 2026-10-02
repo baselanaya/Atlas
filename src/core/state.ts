@@ -123,6 +123,8 @@ export interface Settings {
   chatRoute: "api" | "codex" | "claude" | "ollama";
   voiceEnabled: boolean;
   voiceProfile: string;
+  /** Host dir Voicebox writes audio to; empty = no host playback. */
+  voiceOutputDir: string;
   voiceSpeakChat: boolean;
   voiceSpeakEvents: boolean;
   mcpEnabled: boolean;
@@ -146,6 +148,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatRoute: "api",
   voiceEnabled: false,
   voiceProfile: "",
+  voiceOutputDir: "",
   voiceSpeakChat: true,
   voiceSpeakEvents: true,
   mcpEnabled: false,

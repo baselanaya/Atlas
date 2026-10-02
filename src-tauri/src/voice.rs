@@ -95,28 +95,159 @@ pub async fn status() -> VoiceStatus {
     probe(false).await
 }
 
-/// Says `text` out loud. Quietly does nothing when Voicebox is closed — a
-/// missing studio is not an error the island should ever show.
-pub async fn speak(text: &str, profile: &str) {
+/// One speaker at a time: a second line while the first is still generating
+/// would rather skip than pile up — announcements are news, not a queue.
+/// tokio's mutex, because the guard lives across awaits.
+static SPEAKING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Says `text` out loud, end to end: make room on the GPU, hand the line to
+/// Voicebox, wait for the audio, play it on the host. Quietly does nothing
+/// when Voicebox is closed — a missing studio is not an error the island
+/// should ever show.
+pub async fn speak(text: &str, profile: &str, output_dir: &str) {
     let text: String = text.chars().take(240).collect();
+    if let Ok(_turn) = SPEAKING.try_lock() {
+        speak_locked(&text, profile, output_dir).await;
+    }
+
+}
+
+async fn speak_locked(text: &str, profile: &str, output_dir: &str) {
     let Ok(client) = reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
+        .timeout(Duration::from_secs(30))
         .build()
     else {
         return;
     };
+    let base = match alive_base(&client).await {
+        Some(base) => base,
+        None => return,
+    };
+
+    // An 8 GB card holds one engine: clear whoever else is resident before
+    // this line needs the GPU.
+    if let Some(engine) = profile_engine(&client, &base, profile).await {
+        make_engine_room(&client, &base, &engine).await;
+    }
+
     let mut body = serde_json::json!({ "text": text });
     if !profile.is_empty() {
         // The API resolves `profile` by name or id — `profile_id` alone is a 400.
         body["profile"] = Value::String(profile.to_string());
     }
+    let Ok(resp) = client
+        .post(format!("{base}/speak"))
+        .header("X-Voicebox-Client-Id", CLIENT)
+        .json(&body)
+        .send()
+        .await
+    else {
+        return;
+    };
+    if !resp.status().is_success() {
+        return;
+    }
+    let Ok(v) = resp.json::<Value>().await else { return };
+    let Some(id) = v.get("id").and_then(Value::as_str) else { return };
+
+    // The container has no audio stack of its own — Atlas plays the finished
+    // WAV on the host, from the directory Voicebox's bind mount writes to.
+    // The file is the truth: it appears the moment generation lands, no SSE
+    // racing, and its name is the generation id.
+    if output_dir.is_empty() {
+        return;
+    }
+    let path = std::path::Path::new(output_dir).join(format!("{id}.wav"));
+    let deadline = Instant::now() + Duration::from_secs(240);
+    while Instant::now() < deadline {
+        match std::fs::metadata(&path) {
+            Ok(m) if m.len() > 1024 => {
+                play_host(&path);
+                return;
+            }
+            _ => tokio::time::sleep(Duration::from_millis(400)).await,
+        }
+    }
+    crate::log::line(format!("voice: audio for {id} never landed in {output_dir}"));
+}
+
+/// The first Voicebox base that answers; both stay supported so the docker
+/// deployment and a desktop install can coexist.
+async fn alive_base(client: &reqwest::Client) -> Option<&'static str> {
     for base in BASES {
+        if let Ok(resp) = client.get(format!("{base}/profiles")).send().await {
+            if resp.status().is_success() {
+                return Some(base);
+            }
+        }
+    }
+    None
+}
+
+/// The engine a profile uses, from its own metadata.
+async fn profile_engine(client: &reqwest::Client, base: &str, profile: &str) -> Option<String> {
+    if profile.is_empty() {
+        return None;
+    }
+    let resp = client.get(format!("{base}/profiles")).send().await.ok()?;
+    let v: Value = resp.json().await.ok()?;
+    v.as_array()?
+        .iter()
+        .find(|p| p.get("name").and_then(Value::as_str) == Some(profile))
+        .and_then(|p| p.get("default_engine"))?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// Unloads every resident model that is not the engine we are about to use
+/// (Whisper included in the "leave alone" set — it is tiny and it transcribes).
+async fn make_engine_room(client: &reqwest::Client, base: &str, keep: &str) {
+    let Ok(resp) = client.get(format!("{base}/models/status")).send().await else { return };
+    let Ok(v) = resp.json::<Value>().await else { return };
+    let Some(models) = v.get("models").and_then(Value::as_array) else { return };
+    for m in models {
+        let loaded = m.get("loaded").and_then(Value::as_bool).unwrap_or(false);
+        let Some(name) = m.get("model_name").and_then(Value::as_str) else { continue };
+        if !loaded || name.contains("whisper") || name.starts_with(keep) {
+            continue;
+        }
         let _ = client
-            .post(format!("{base}/speak"))
-            .header("X-Voicebox-Client-Id", CLIENT)
-            .json(&body)
+            .post(format!("{base}/models/{name}/unload"))
             .send()
             .await;
+        crate::log::line(format!("voice: unloaded {name} to make room for {keep}"));
+    }
+}
+
+
+/// Plays the finished line through the host's audio stack. PipeWire first,
+/// PulseAudio fallback — the same stack the desktop already uses.
+fn play_host(path: &std::path::Path) {
+    if !path.exists() {
+        return;
+    }
+    #[cfg(unix)]
+    {
+        for player in ["pw-play", "paplay"] {
+            if let Ok(mut child) = std::process::Command::new(player)
+                .arg(path)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+            {
+                // Reap what we spawn: an island that never waits for its own
+                // children fills the process table with zombies.
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
+                return;
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
     }
 }
 
