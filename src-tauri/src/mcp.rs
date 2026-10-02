@@ -8,7 +8,6 @@
 //! approve or deny a request — point it only at tools you trust, same rule
 //! as the agents' own hooks.
 
-use std::io::Read;
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -174,6 +173,14 @@ fn tool_specs() -> Value {
             },
         },
         {
+            "name": "atlas_tokens",
+            "description": "Token usage per agent per day, read from the agents' own session transcripts (Claude Code, Codex).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "days": { "type": "integer", "minimum": 1, "maximum": 60 } },
+            },
+        },
+        {
             "name": "atlas_stats",
             "description": "Per-agent daily activity counters for the last N days (default 7).",
             "inputSchema": {
@@ -224,6 +231,10 @@ fn call_tool(app: &AppHandle, name: &str, args: &Value) -> String {
                 crate::voice::speak(&spoken, &profile).await;
             });
             format!("Speaking: {text}")
+        }
+        "atlas_tokens" => {
+            let days = args.get("days").and_then(Value::as_u64).unwrap_or(7).clamp(1, 60) as usize;
+            serde_json::to_string_pretty(&crate::tokens::scan(days)).unwrap_or_default()
         }
         "atlas_stats" => {
             let days = args.get("days").and_then(Value::as_u64).unwrap_or(7).clamp(1, 60) as usize;

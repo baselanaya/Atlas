@@ -11,6 +11,7 @@ pub mod layershell;
 mod mcp;
 mod notify;
 mod stats;
+mod tokens;
 mod log;
 mod pipe;
 mod secrets;
@@ -260,6 +261,11 @@ fn mcp_status(app: AppHandle) -> mcp::McpStatus {
 #[tauri::command]
 fn stats_snapshot(days: Option<usize>) -> serde_json::Value {
     stats::snapshot_json(days.unwrap_or(7).clamp(1, 60))
+}
+
+#[tauri::command]
+fn tokens_snapshot(days: Option<usize>) -> serde_json::Value {
+    serde_json::to_value(tokens::scan(days.unwrap_or(7).clamp(1, 60))).unwrap_or_default()
 }
 
 /// Voice → text through Voicebox's /transcribe (multipart audio upload).
@@ -545,6 +551,7 @@ pub fn run() {
             voice_transcribe,
             mcp_status,
             stats_snapshot,
+            tokens_snapshot,
             hooks_status,
             hooks_statuses,
             hooks_preview,

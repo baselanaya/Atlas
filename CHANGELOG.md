@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-10-02
+
+- **Token tracking** — real usage per agent per day, read from the agents'
+  own session transcripts (Claude Code's per-message `usage`, Codex's
+  cumulative `token_count`), shown in Settings → Stats and available to MCP
+  clients as `atlas_tokens`. zcode writes no readable transcripts and reports
+  nothing here — no estimates, only measurements.
+- **Voicebox pairing guide** — docs/voicebox.md covers both directions:
+  Voicebox as Atlas's voice, and Voicebox (or any MCP client) talking to
+  Atlas's tool server.
+
 ## 0.5.0 — 2026-10-02
 
 - **MCP-out** — Atlas is now a tool server: any local MCP client can call

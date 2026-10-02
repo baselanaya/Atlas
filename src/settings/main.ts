@@ -463,6 +463,19 @@ function statsSection(): HTMLElement {
       ));
     }
     if (days.length === 0) body.append(h("div", { class: "hint", text: "—" }));
+
+    // Tokens come from the agents' own transcripts, not from Atlas.
+    const tokens = await Bridge.tokensSnapshot(7);
+    const tdays = Object.entries((tokens ?? {}) as Record<string, Record<string, { input: number; output: number; cache_read: number }>>)
+      .sort((a, b) => b[0].localeCompare(a[0]));
+    for (const [day, agents] of tdays.slice(0, 7)) {
+      const cells = Object.entries(agents).map(([agent, t]) =>
+        `${agent}: ${(t.input + t.output) / 1000 | 0}k tokens (${(t.cache_read / 1000) | 0}k cached)`);
+      body.append(h("div", { class: "row" },
+        h("label", { text: `${day} · tokens` }),
+        h("span", { class: "hint", text: cells.join(" · ") }),
+      ));
+    }
   })();
   return h("section", {}, h("h2", {}, h("span", { text: STR.stats })), body);
 }
