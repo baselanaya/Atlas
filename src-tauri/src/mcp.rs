@@ -293,3 +293,63 @@ mod tests {
         assert_eq!(off.0, 404);
     }
 }
+
+
+// ── stdio bridge ──────────────────────────────────────────────────────────────
+
+/// Forwards stdin JSON-RPC lines to the island's HTTP MCP, line by line, so
+/// stdio-only clients (Codex and friends) can use the same tools. Fails with
+/// a readable message when the island isn't running — a dead bridge should
+/// say so, not hang.
+pub fn stdio_bridge() -> i32 {
+    use std::io::{BufRead, Write};
+
+    let port = std::env::var("ATLAS_MCP_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(DEFAULT_PORT);
+    let url = format!("http://127.0.0.1:{port}/mcp");
+
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+    for line in stdin.lock().lines() {
+        let Ok(line) = line else { break };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let target = url.clone();
+        let response = std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let client = reqwest::blocking::Client::builder()
+                    .timeout(std::time::Duration::from_secs(30))
+                    .build()
+                    .map_err(|e| e.to_string())?;
+                let resp = client
+                    .post(&target)
+                    .header("content-type", "application/json")
+                    .body(line)
+                    .send()
+                    .map_err(|_| format!("Atlas isn't running at {}", target.clone()))?;
+                let _ = resp.status();
+                let body = resp.text().map_err(|e| e.to_string())?;
+                // Empty bodies (notifications) and error bodies both pass
+                // through as-is — the client's JSON-RPC layer knows the shapes.
+                Ok::<String, String>(body)
+            })
+            .join()
+        });
+        match response {
+            Ok(Ok(text)) if !text.is_empty() => {
+                let _ = writeln!(stdout, "{text}");
+                let _ = stdout.flush();
+            }
+            Ok(Ok(_)) => {} // 202-style empties: notifications
+            Ok(Err(e)) => {
+                let _ = writeln!(stdout, "{{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{{\"code\":-32000,\"message\":\"{e}\"}}}}");
+                let _ = stdout.flush();
+            }
+            Err(_) => break,
+        }
+    }
+    0
+}

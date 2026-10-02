@@ -8,7 +8,7 @@ mod hooks;
 mod integrations;
 mod island;
 pub mod layershell;
-mod mcp;
+pub mod mcp;
 mod notify;
 mod stats;
 mod tokens;

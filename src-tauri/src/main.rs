@@ -2,6 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    // `atlas --mcp-stdio` — a stdio↔HTTP bridge for MCP clients that only
+    // speak stdio (Codex, Claude Code, ZCode). The island itself keeps
+    // serving on its HTTP port; this just forwards JSON-RPC lines to it.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--mcp-stdio") {
+        std::process::exit(atlas_lib::mcp::stdio_bridge());
+    }
+
     #[cfg(target_os = "linux")]
     choose_backend();
     atlas_lib::run()

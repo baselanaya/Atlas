@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-10-02
+
+- **MCP over stdio** — `atlas --mcp-stdio` bridges stdin/stdout JSON-RPC to
+  the island's HTTP server, so stdio-only clients work too. Verified
+  end-to-end with Codex as the client: `codex mcp add atlas -- atlas
+  --mcp-stdio`, then "use the atlas_status tool" returns the live agent
+  state. `ATLAS_MCP_PORT` overrides the forwarded port.
+- docs/voicebox.md covers stdio registration.
+
 ## 0.6.0 — 2026-10-02
 
 - **Token tracking** — real usage per agent per day, read from the agents'

@@ -38,3 +38,22 @@ and a voice "approve it" can clear a pending request.
 **Trust note**: `atlas_decide` answers an agent's permission prompt. Point it
 only at clients you'd trust with your terminal — the same bar as the agents'
 own hooks.
+
+
+## 3. Any stdio MCP client (Codex, Claude Code, ZCode)
+
+Atlas also speaks MCP over stdio, bridging to its HTTP server — one binary
+flag, no extra process to install:
+
+```
+atlas --mcp-stdio        # JSON-RPC on stdin/stdout, forwarded to the island
+```
+
+Codex, for example:
+
+```
+codex mcp add atlas -- /usr/local/bin/atlas --mcp-stdio
+codex exec "Use the atlas_status tool and report what the agents are doing."
+```
+
+`ATLAS_MCP_PORT` overrides the port the bridge forwards to.
