@@ -88,3 +88,27 @@ four local adjustments on a classic-builder daemon:
 Create a profile once (or in the UI): `POST /profiles {"name":"Atlas",
 "voice_type":"preset","preset_engine":"kokoro","preset_voice_id":"af_alloy"}`,
 pick it in Settings → Voice → Voice, and the island talks.
+
+
+## The voice Atlas uses here
+
+**Qwen3-TTS 1.7B CustomVoice, speaker `Aiden`** — the most human-sounding
+preset Voicebox ships, running on the GPU (~2 s to speak a sentence once
+warm). Two extra steps beyond the recipe above:
+
+- give the container a compiler before the first Qwen generation:
+  `docker exec -u 0 voicebox apt-get install -y gcc` (Triton builds kernels
+  on first run; lost on recreate, so re-run after `docker compose up
+  --force-recreate`), and
+- `gpus: all` in the compose override — on CPU this model is not smooth.
+
+Create the profile once:
+
+```
+POST /profiles {"name":"Atlas","language":"en","voice_type":"preset",
+  "preset_engine":"qwen_custom_voice","preset_voice_id":"Aiden",
+  "default_engine":"qwen_custom_voice"}
+```
+
+Then Settings → Voice → Voice: `Atlas`. Other good presets: `Ryan` (dynamic
+male), `Serena` (warm female, zh/multilingual).
