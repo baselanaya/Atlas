@@ -88,6 +88,7 @@ mod tests {
 
     #[test]
     fn ingest_copies_and_never_overwrites() {
+        let _home = crate::TEST_HOME_LOCK.lock().unwrap();
         let tmp = std::env::temp_dir().join(format!("atlas-test-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
         let source = tmp.join("note.txt");

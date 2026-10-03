@@ -319,6 +319,7 @@ fn play_host(path: &std::path::Path) {
     if !path.exists() {
         return;
     }
+    crate::achievements::mark_voice_spoken();
     trim_trailing_silence(path);
     // The trimmer writes a `.trimmed.wav` beside the original when it can't
     // overwrite the container's file; prefer it when present.

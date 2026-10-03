@@ -86,6 +86,8 @@ pub fn record(agent: &str, event: &str, extra: Option<&str>) {
                     _ => {}
                 }
             }
+            drop(guard);
+            persist();
             return;
         }
         match event {

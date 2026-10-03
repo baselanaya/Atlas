@@ -72,6 +72,10 @@ export function syncMiniBotStates(tasks: AgentTask[]) {
   }
 }
 
+export function miniBotsActive(): boolean {
+  return live.size > 0;
+}
+
 export function tickMiniBots(dt: number) {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   for (const mb of live.values()) {

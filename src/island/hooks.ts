@@ -150,16 +150,14 @@ function upsert(taskId: string, projectName: string, cwd: string, agent: string)
   t.agent = agent;
 }
 
-function clearSession() {
-  for (const id of Object.keys(BASE_NAMES)) {
-    const t = State.tasks.find((x) => x.id === id);
-    if (!t) continue;
-    t.steps = [];
-    t.stepIndex = 0;
-    t.name = BASE_NAMES[id];
-    t.agent = null;
-    t.pillBadge = null;
-  }
+function clearSession(taskId: string) {
+  const t = State.tasks.find((x) => x.id === taskId);
+  if (!t) return;
+  t.steps = [];
+  t.stepIndex = 0;
+  t.name = BASE_NAMES[taskId] ?? "Session";
+  t.agent = null;
+  t.pillBadge = null;
 }
 
 export function registerHookHandlers(island: Island) {
@@ -292,7 +290,7 @@ function handleHook(island: Island, payload: HookPayload) {
 
     case "SessionEnd":
       State.updateTask(taskId, "idle");
-      clearSession();
+      clearSession(taskId);
       break;
 
     case "SubagentStart":

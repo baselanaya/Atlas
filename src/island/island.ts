@@ -13,7 +13,7 @@ import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { BotEngine, hexToRGB } from "../atlas/engine";
 import { Greeting } from "../atlas/greeting";
-import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../atlas/minibots";
+import { createMiniBot, miniBotsActive, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../atlas/minibots";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
@@ -594,6 +594,8 @@ export class Island {
 
     // Outside Tauri (plain browser) drive the cursor from DOM events so the
     // island can be inspected with `npm run dev`.
+    (window as unknown as { __atlasIsland?: Island }).__atlasIsland = this;
+
     if (!IS_TAURI) {
       window.addEventListener("mousemove", (e) => this.onCursor(e.clientX, e.clientY));
     }
@@ -763,7 +765,8 @@ export class Island {
       ? settling
       : settling ||
         !this.botCx.settled || !this.botCy.settled || !this.botSize.settled ||
-        greetingActive || this.engine.busy || UploadSeq.isActive;
+        greetingActive || this.engine.busy || UploadSeq.isActive
+        || miniBotsActive(); // mini bots keep breathing even when the island is quiet
 
     if (busy) {
       requestAnimationFrame(this.frame);

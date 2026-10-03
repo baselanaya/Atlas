@@ -79,6 +79,13 @@ pub struct CheckContext {
     pub voice_spoken: bool,
 }
 
+/// Set once when the voice pipeline plays audio for the first time.
+pub fn mark_voice_spoken() {
+    USES_VOICE.store(true, std::sync::atomic::Ordering::Release);
+}
+
+static USES_VOICE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Checks all achievements, saves state, and returns the newly-unlocked one
 /// (if any) so the caller can fire the emote and sound.
 pub fn check(ctx: &CheckContext) -> Option<Achievement> {
@@ -104,7 +111,7 @@ pub fn check(ctx: &CheckContext) -> Option<Achievement> {
             "triple_agent" => ctx.agents_today.len() >= 3,
             "night_owl" => ctx.is_night,
             "early_bird" => ctx.is_early,
-            "first_voice" => ctx.voice_spoken,
+            "first_voice" => ctx.voice_spoken || USES_VOICE.load(std::sync::atomic::Ordering::Acquire),
             _ => false,
         };
         if earned {

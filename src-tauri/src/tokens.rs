@@ -50,18 +50,41 @@ pub fn window_usage() -> WindowUsage {
 
 /// "YYYY-MM-DDTHH" — hour precision is plenty for a 5-hour window.
 fn now_minus_hours(hours: i32) -> String {
-    let t = crate::log::LocalTime::now();
-    let (y, m, d) = days_back(t.year, t.month as i32, t.day as i32, 0);
-    let mut h = t.hour as i32 - hours;
-    let (y, m, d) = if h < 0 {
-        h += 24;
-        let (ny, nm, nd) = days_back(y, m, d, 1);
-        (ny, nm, nd)
-    } else {
-        (y, m, d)
-    };
-    format!("{y:04}-{m:02}-{d:02}T{h:02}")
+    // Claude Code writes timestamps in UTC; the cutoff must be UTC too,
+    // or the window is skewed by the machine's offset.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let adjusted = now - (hours as i64) * 3600;
+    let days = adjusted.div_euclid(86400);
+    let secs = adjusted.rem_euclid(86400);
+    let (y, m, d) = epoch_to_civil(days);
+    format!("{y:04}-{m:02}-{d:02}T{:02}", secs / 3600)
 }
+
+/// Days-since-epoch to (y, m, d) — Howard Hinnant's civil_from_days.
+fn epoch_to_civil(z: i64) -> (i64, i64, i64) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+#[cfg(test)]
+#[test]
+fn epoch_to_civil_matches_known_dates() {
+    assert_eq!(epoch_to_civil(0), (1970, 1, 1));
+    assert_eq!(epoch_to_civil(19_723), (2024, 1, 1));
+    assert_eq!(epoch_to_civil(20_666), (2026, 8, 1));
+}
+
 
 fn window_claude(out: &mut WindowUsage, cutoff: &str) {
     let root = home().join(".claude").join("projects");
@@ -120,6 +143,8 @@ fn window_codex(out: &mut WindowUsage, cutoff: &str) {
                         }
                     }
                     if let Some(u) = last {
+                        // Cumulative for the whole session, not windowed to 5h.
+                        // The 6h mtime filter bounds the overcount.
                         let input = u.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
                         *out.agents.entry("codex".into()).or_default() += input;
                     }
