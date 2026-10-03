@@ -300,7 +300,17 @@ fn trim_trailing_silence(path: &std::path::Path) {
     let data_size_pos = data_start - 4;
     out[data_size_pos..data_size_pos + 4].copy_from_slice(&dlen.to_le_bytes());
 
-    let _ = std::fs::write(path, &out);
+    // The original belongs to the container's user and can't be modified;
+    // write a trimmed copy beside it (the directory is world-writable).
+    let trimmed_path = path.with_extension("trimmed.wav");
+    match std::fs::write(&trimmed_path, &out) {
+        Ok(()) => {
+            crate::log::line(format!("voice: trimmed copy at {}", trimmed_path.display()));
+        }
+        Err(err) => {
+            crate::log::line(format!("voice: trim write failed: {err}"));
+        }
+    }
 }
 
 /// Plays the finished line through the host's audio stack. PipeWire first,
@@ -310,11 +320,15 @@ fn play_host(path: &std::path::Path) {
         return;
     }
     trim_trailing_silence(path);
+    // The trimmer writes a `.trimmed.wav` beside the original when it can't
+    // overwrite the container's file; prefer it when present.
+    let trimmed = path.with_extension("trimmed.wav");
+    let play_path = if trimmed.exists() { &trimmed } else { path };
     #[cfg(unix)]
     {
         for player in ["pw-play", "paplay"] {
             if let Ok(mut child) = std::process::Command::new(player)
-                .arg(path)
+                .arg(play_path)
                 .stdin(std::process::Stdio::null())
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
