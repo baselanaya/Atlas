@@ -220,12 +220,96 @@ async fn make_engine_room(client: &reqwest::Client, base: &str, keep: &str) {
 }
 
 
+/// Trims trailing silence from a 16-bit PCM WAV — the TTS engines pad
+/// their output (measured: 0.46s on a 1.73s clip, 27% dead air). Finds the
+/// last audible sample, keeps a 60ms tail for naturalness, rewrites the file.
+/// Any parse failure leaves the original untouched.
+fn trim_trailing_silence(path: &std::path::Path) {
+    let Ok(bytes) = std::fs::read(path) else {
+        crate::log::line("voice: trim — could not read file".to_string());
+        return;
+    };
+    if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return;
+    }
+
+    // Walk the chunks to find "fmt " and "data".
+    let mut pos = 12;
+    let mut channels: u16 = 0;
+    let mut rate: u32 = 0;
+    let mut bits: u16 = 0;
+    let mut data_start: usize = 0;
+    let mut data_len: usize = 0;
+    while pos + 8 <= bytes.len() {
+        let chunk_id = &bytes[pos..pos + 4];
+        let chunk_len = u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]]) as usize;
+        if chunk_id == b"fmt " && pos + 8 + 16 <= bytes.len() {
+            channels = u16::from_le_bytes([bytes[pos + 10], bytes[pos + 11]]);
+            rate = u32::from_le_bytes([bytes[pos + 12], bytes[pos + 13], bytes[pos + 14], bytes[pos + 15]]);
+            bits = u16::from_le_bytes([bytes[pos + 22], bytes[pos + 23]]);
+        } else if chunk_id == b"data" {
+            data_start = pos + 8;
+            data_len = chunk_len.min(bytes.len() - data_start);
+            break;
+        }
+        pos += 8 + chunk_len + (chunk_len & 1); // chunks are word-aligned
+    }
+
+    // Only trim what we understand: 16-bit PCM.
+    if bits != 16 || channels == 0 || rate == 0 || data_len < 4 {
+        return;
+    }
+
+    let bytes_per_frame = (bits / 8) as usize * channels as usize;
+    let frames = data_len / bytes_per_frame;
+    let samples: &[i16] = unsafe {
+        std::slice::from_raw_parts(bytes[data_start..].as_ptr() as *const i16, data_len / 2)
+    };
+
+    // Find the last frame where any channel exceeds the threshold.
+    const THRESHOLD: i16 = 300;
+    let mut last_audible_frame = 0;
+    for frame in (0..frames).rev() {
+        let base = frame * channels as usize;
+        if (0..channels as usize).any(|c| samples[base + c].abs() > THRESHOLD) {
+            last_audible_frame = frame;
+            break;
+        }
+    }
+
+    // Keep 60ms of tail past the last audible frame, but never more than
+    // the original.
+    let tail_frames = (rate as usize * 60 / 1000).max(1);
+    let keep_frames = (last_audible_frame + tail_frames).min(frames);
+    if keep_frames >= frames {
+        crate::log::line("voice: trim — nothing to trim".to_string());
+        return;
+    }
+    crate::log::line(format!(
+        "voice: trimming {} → {} frames ({}s → {}s)",
+        frames, keep_frames, frames as f64 / rate as f64, keep_frames as f64 / rate as f64
+    ));
+
+    let keep_bytes = keep_frames * bytes_per_frame;
+    let trimmed_len = data_start + keep_bytes;
+    let mut out = bytes[..trimmed_len].to_vec();
+    // Fix the RIFF and data chunk sizes.
+    let total = (trimmed_len - 8) as u32;
+    out[4..8].copy_from_slice(&total.to_le_bytes());
+    let dlen = keep_bytes as u32;
+    let data_size_pos = data_start - 4;
+    out[data_size_pos..data_size_pos + 4].copy_from_slice(&dlen.to_le_bytes());
+
+    let _ = std::fs::write(path, &out);
+}
+
 /// Plays the finished line through the host's audio stack. PipeWire first,
 /// PulseAudio fallback — the same stack the desktop already uses.
 fn play_host(path: &std::path::Path) {
     if !path.exists() {
         return;
     }
+    trim_trailing_silence(path);
     #[cfg(unix)]
     {
         for player in ["pw-play", "paplay"] {
@@ -294,7 +378,7 @@ fn transcribe_value(v: Value) -> Result<String, String> {
         .trim()
         .to_string();
     if text.is_empty() {
-        return Err("Voicebox returned no transcript.".into());
+        return Err("Voicebox returned no transcript.".to_string());
     }
     Ok(text)
 }
